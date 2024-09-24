@@ -59,7 +59,7 @@ const diningHalls = [
         menu: [
             { id: '1', name: 'Pizza' },
             { id: '2', name: 'Salad' },
-            { id: '3', name: 'Burger'},
+            { id: '3', name: 'Pasta'},
         ]
     },
 
@@ -116,7 +116,7 @@ const diningHalls = [
         menu: [
             { id: '1', name: 'Pizza' },
             { id: '2', name: 'Salad' },
-            { id: '3', name: 'Burger'},
+            { id: '3', name: 'Rice'},
         ]
     },
 
@@ -203,7 +203,7 @@ const diningHalls = [
             { day: 'Sunday', open: '10:00 AM', close: '9:00 PM' }
         ],
         menu: [
-            { id: '1', name: 'Pizza' },
+            { id: '1', name: 'Sandwiches' },
         ]
     },
 
@@ -221,7 +221,7 @@ const diningHalls = [
             { day: 'Sunday', open: '3:00 PM', close: '10:00 PM' }
         ],
         menu: [
-            { id: '1', name: 'Pizza' },
+            { id: '1', name: 'Chicken Tenders' },
         ]
     },
 
@@ -239,7 +239,7 @@ const diningHalls = [
             { day: 'Sunday', open: 'Closed', close: 'Closed' }
         ],
         menu: [
-            { id: '1', name: 'Pizza' },
+            { id: '1', name: 'Smoothies' },
         ]
     },
 
@@ -257,7 +257,7 @@ const diningHalls = [
             { day: 'Sunday', open: 'Closed', close: 'Closed' }
         ],
         menu: [
-            { id: '1', name: 'Pizza' },
+            { id: '1', name: 'Coffee' },
         ]
     },
 ];
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 20,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#99773d',
     },
     header: {
         flexDirection: 'row',
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     statusText: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#555',
+        color: '#333',
     },
     buttonContainer: {
         flexDirection: 'row',

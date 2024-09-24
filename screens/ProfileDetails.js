@@ -1,26 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet, Button } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
-const ProfileScreen = ({ navigation }) => {
-    const user = {
-        name: 'John Doe',
-        email: 'johndoe@example.com',
-    };
+const ProfileDetails = ({ route }) => {
+    const { name, email } = route.params;
 
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Profile</Text>
             <View style={styles.infoContainer}>
                 <Text style={styles.label}>Name:</Text>
-                <Text style={styles.info}>{user.name}</Text>
+                <Text style={styles.info}>{name}</Text>
 
                 <Text style={styles.label}>Email:</Text>
-                <Text style={styles.info}>{user.email}</Text>
+                <Text style={styles.info}>{email}</Text>
             </View>
-            <Button
-                title="Edit Profile"
-                onPress={() => alert('Edit Profile functionality not implemented yet!')}
-            />
         </View>
     );
 };
@@ -49,4 +42,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ProfileScreen;
+export default ProfileDetails;
