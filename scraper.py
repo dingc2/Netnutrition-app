@@ -2,81 +2,54 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import time
 
-chrome_options = webdriver.ChromeOptions()
-# Add any desired options here, for example, headless mode:
-# chrome_options.add_argument("--headless")
+# Set up your browser driver with options for maximizing the window
+options = webdriver.ChromeOptions()
+options.add_argument("--start-maximized")  # Start the browser maximized
+driver = webdriver.Chrome(options=options)
 
-# Set up WebDriver using WebDriver Manager
-driver = webdriver.Chrome(options=chrome_options)
+# Open the NetNutrition URL
+driver.get('https://netnutrition.cbord.com/nn-prod/vucampusdining')
 
-# Navigate to the website
-driver.get("https://netnutrition.cbord.com/nn-prod/vucampusdining")
-driver.fullscreen_window()
+# Wait for the "Continue" button to appear and click it
+try:
+    continue_button = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Continue']"))
+    )
+    continue_button.click()
+    print("Clicked 'Continue' button.")
+except Exception as e:
+    print("Error clicking 'Continue' button:", e)
+    driver.quit()
+    exit()
 
-wait = WebDriverWait(driver, 10)  # Wait up to 10 seconds
-driver.save_screenshot('screenshot.png')
+# Wait for the dining hall dropdown to be available
+try:
+    dining_hall_dropdown = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.ID, "dropdownUnitButton"))
+    )
+    dining_hall_dropdown.click()
 
-# Click the continue button
-button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Continue']")))
-button.click()
+    # Get all dining hall options
+    dining_halls = driver.find_elements(By.CSS_SELECTOR, "#nav-unit-selector .dropdown-item a")
 
-# Wait for the dropdown link to be clickable and click it
-dropdown = wait.until(EC.element_to_be_clickable((By.ID, "dropdownUnitButton")))
-dropdown.click()
-
-# Wait for the dropdown items to be visible
-wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "dropdown-menu")))
-
-# Retrieve the dropdown items for dining halls
-dropdown_items = driver.find_elements(By.CSS_SELECTOR, ".dropdown-menu .dropdown-item a")
-
-if dropdown_items:
-    # Start from the first item (index 0)
-    for item in dropdown_items[1:]:  # This slices the list to skip the first item
-        print("Clicking on dining hall option: ", item.text)
-        item.click()  # Click on the dining hall option
+    # Loop through the dining halls without unnecessary waits
+    for dining_hall in dining_halls:
+        # Get the visible text of the dining hall (which is the full name)
+        dining_hall_name = dining_hall.text.strip()
+        print(f"Dining Hall: {dining_hall_name}")  # Print the dining hall name
         
-        time.sleep(1)  # Adjust the time as needed
+        # Click the dining hall using JavaScript to avoid interactable error
+        driver.execute_script("arguments[0].click();", dining_hall)
+
+        # Immediately close the dropdown and select the next dining hall
+        dining_hall_dropdown.click()
         
-        try:
-            # Now click the date dropdown
-            date_dropdown = wait.until(EC.element_to_be_clickable((By.ID, "dropdownDateButton")))
-            date_dropdown.click()
-            
-            # Wait for the date dropdown items to be visible
-            wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "#nav-date-selector .dropdown-menu")))
+        # Get dining halls again without waiting
+        dining_halls = driver.find_elements(By.CSS_SELECTOR, "#nav-unit-selector .dropdown-item a")
 
-            # Retrieve the dropdown items for dates
-            date_items = driver.find_elements(By.CSS_SELECTOR, "#nav-date-selector .dropdown-menu .dropdown-item")
+except Exception as e:
+    print("Error during dining hall iteration:", e)
 
-            if date_items:
-                # Loop through date items and click each one
-                for date_item in date_items:
-                    print("Clicking on date option: ", date_item.text)
-                    date_item.click()  # Click on the date option
-
-                    time.sleep(1)  # Wait for 1 second before the next click
-                    
-                    # Reopen the date dropdown for the next item
-                    date_dropdown.click()
-                    
-                    # Wait for the dropdown items to be visible again
-                    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "#nav-date-selector .dropdown-menu")))
-            else:
-                print("No date items found!")
-                
-        except Exception as e:
-            print("An error occurred while handling the date dropdown:", str(e))
-        
-        # Reopen the dining hall dropdown for the next item
-        dropdown.click()
-        
-        # Wait for the dropdown items to be visible again
-        wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "dropdown-menu")))
-else:
-    print("No dropdown items found!")
-
-# Close the browser when done
+# Close the browser
 driver.quit()
