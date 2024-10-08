@@ -66,6 +66,19 @@ try:
                 # Click the date using JavaScript
                 driver.execute_script("arguments[0].click();", date_option)
 
+                date_dropdown.click()
+
+                try:
+                    meal_dropdown = WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((By.ID, "dropdownMealButton"))
+                    )
+                    meal_dropdown.click()
+
+                    # Wait for meal options to be visible and select from item 2 onwards
+                    meal_options = WebDriverWait(driver, 10).until(
+                        EC.visibility_of_all_elements_located((By.CSS_SELECTOR, "#nav-meal-selector .dropdown-item"))
+                    )[1:]  # Get all date options starting from the second item
+
                 # Refresh the date options without waiting
                 date_options = driver.find_elements(By.CSS_SELECTOR, "#nav-date-selector .dropdown-item")[1:]
 
