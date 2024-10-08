@@ -28,8 +28,18 @@ const puppeteer = require('puppeteer');
     await page.waitForSelector(".dropdown-menu", { visible: true });
 
     // Retrieve the dropdown items for dining halls
-    const dropdownItems = await page.$$(".dropdown-menu .dropdown-item a");
+	const dropdownItems = await page.$$(".dropdown-menu .dropdown-item a");
+	const dropdownMealItems = await page.$$(".dropdown-menu .dropdown-item a");
 
+	// TODO NOT WORKING YET 
+	if (dropdownItems.length > 0) {
+		for (let i = 1; i < dropdownItems.length; i++) {
+			const item = dropdownItems[i];
+            const text = await (await item.getProperty('textContent')).jsonValue();
+            console.log(`Clicking on meal option: ${text}`);
+            await item.click();
+		}
+	}
     if (dropdownItems.length > 0) {
         // Loop through the dining hall options, starting from index 1
         for (let i = 1; i < dropdownItems.length; i++) {
