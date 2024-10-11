@@ -43,53 +43,40 @@ try:
         # Click the dining hall using JavaScript
         driver.execute_script("arguments[0].click();", dining_hall)
 
-        # Close the dining hall dropdown
-        dining_hall_dropdown.click()
-
-        # Wait for the date dropdown to be available (the second dropdown)
+        # Select "Show All Dates"
         try:
             date_dropdown = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.ID, "dropdownDateButton"))
             )
             date_dropdown.click()
 
-            # Wait for date options to be visible and select from the second item onwards
-            date_options = WebDriverWait(driver, 10).until(
-                EC.visibility_of_all_elements_located((By.CSS_SELECTOR, "#nav-date-selector .dropdown-item"))
-            )[1:]  # Get all date options starting from the second item
-
-            # Loop through the date options
-            for date_option in date_options:
-                date_name = date_option.get_attribute("innerText").strip()
-                print(f"Date: {date_name}")  # Print the date
-                
-                # Click the date using JavaScript
-                driver.execute_script("arguments[0].click();", date_option)
-
-                date_dropdown.click()
-
-                try:
-                    meal_dropdown = WebDriverWait(driver, 10).until(
-                        EC.element_to_be_clickable((By.ID, "dropdownMealButton"))
-                    )
-                    meal_dropdown.click()
-
-                    # Wait for meal options to be visible and select from item 2 onwards
-                    meal_options = WebDriverWait(driver, 10).until(
-                        EC.visibility_of_all_elements_located((By.CSS_SELECTOR, "#nav-meal-selector .dropdown-item"))
-                    )[1:]  # Get all date options starting from the second item
-
-                # Refresh the date options without waiting
-                date_options = driver.find_elements(By.CSS_SELECTOR, "#nav-date-selector .dropdown-item")[1:]
-
-            # Go back to the dining hall dropdown for the next iteration
-            dining_hall_dropdown.click()
-            dining_halls = driver.find_elements(By.CSS_SELECTOR, "#nav-unit-selector .dropdown-item a")  # Refresh dining halls
-
+            # Wait for date options and select "Show All Dates"
+            all_dates_option = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//a[text()='Show All Dates']"))
+            )
+            all_dates_option.click()
+            print("Selected 'Show All Dates'.")
         except Exception as e:
-            print("Error interacting with date dropdown:", e)
-            # Close the dining hall dropdown if there's an error
-            dining_hall_dropdown.click()
+            print("Error selecting 'Show All Dates':", e)
+
+        # Check for the presence of the menu panel and its content
+        time.sleep(2)  # Wait for the content to load
+        try:
+            menu_list = driver.find_elements(By.CLASS_NAME, "cbo_nn_menuListDiv")
+            if menu_list:
+                # Check if there's at least one menu item in the list
+                menu_items = menu_list[0].find_elements(By.XPATH, ".//a[contains(@class, 'cbo_nn_menuLink')]")
+                if menu_items:
+                    print("Menu List: Yes")
+                else:
+                    print("Menu List: No (No menu items found)")
+            else:
+                print("Menu List: No (Menu list div not found)")
+        except Exception as e:
+            print("Error checking for menu list class:", e)
+
+        # Go back to the dining hall dropdown for the next iteration
+        dining_hall_dropdown.click()
 
 except Exception as e:
     print("Error during dining hall iteration:", e)
