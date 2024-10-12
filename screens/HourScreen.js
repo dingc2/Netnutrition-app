@@ -1,19 +1,37 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 
 const HoursScreen = ({ route }) => {
-    const { hallName, hours } = route.params;
+    const { hallId, hallName } = route.params;
+    const [hours, setHours] = useState([]);
+
+    useEffect(() => {
+        fetchHours();
+    }, []);
+
+    const fetchHours = async () => {
+        try {
+            const response = await fetch(`http://localhost:3000/dining-halls/${hallId}/hours`);
+            const data = await response.json();
+            setHours(data);
+        } catch (error) {
+            console.error('Error fetching hours:', error);
+        }
+    };
 
     return (
         <View style={styles.container}>
             <Text style={styles.title}>{hallName} - Hours</Text>
-            <View style={styles.hoursContainer}>
-                {hours.map((hour, index) => (
-                    <Text key={index} style={styles.hour}>
-                        {hour.day}: {hour.open} - {hour.close}
-                    </Text>
-                ))}
-            </View>
+            <FlatList
+                data={hours}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                    <View style={styles.hourItem}>
+                        <Text style={styles.day}>{item.day_of_week}</Text>
+                        <Text style={styles.time}>{item.opening_time} - {item.closing_time}</Text>
+                    </View>
+                )}
+            />
         </View>
     );
 };
@@ -29,14 +47,20 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginBottom: 20,
     },
-    hoursContainer: {
+    hourItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         padding: 10,
         backgroundColor: '#ddd',
         borderRadius: 5,
-    },
-    hour: {
-        fontSize: 16,
         marginBottom: 10,
+    },
+    day: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    time: {
+        fontSize: 16,
     },
 });
 

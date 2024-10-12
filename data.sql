@@ -1,0 +1,45 @@
+INSERT INTO DiningHalls (name)
+VALUES ('Rand'),
+	('Commons'), 
+       ('Rothschild'), 
+       ('Zeppos'), 
+       ('Cafe Carmichael'),
+       ('EBI'),
+       ('The Kitchen at Kissam'),
+       ('Wasabi');
+
+INSERT INTO Hours (dining_hall_id, day_of_week, opening_time, closing_time)
+VALUES (1, 'Monday', '08:00', '22:00'),
+       (1, 'Tuesday', '08:00', '22:00'),
+       (2, 'Monday', '07:00', '20:00'),
+       (2, 'Tuesday', '07:00', '20:00'),
+       (3, 'Monday', '08:00', '22:00'),
+       (3, 'Tuesday', '08:00', '22:00'),
+       (4, 'Monday', '07:00', '20:00'),
+       (4, 'Tuesday', '07:00', '20:00'),
+       (5, 'Monday', '08:00', '22:00'),
+       (5, 'Tuesday', '08:00', '22:00'),
+       (6, 'Monday', '07:00', '20:00'),
+       (6, 'Tuesday', '07:00', '20:00'),
+       (7, 'Monday', '08:00', '22:00'),
+       (7, 'Tuesday', '08:00', '22:00'),
+       (8, 'Monday', '07:00', '20:00'),
+       (8, 'Saturday', '07:00', '20:00');
+
+INSERT INTO MenuItems (dining_hall_id, item_name, dietary_info)
+VALUES (1, 'Pasta', 'Vegetarian'),
+       (1, 'Burger', 'Non-Vegetarian'),
+       (2, 'Salad', 'Vegan'),
+       (2, 'Pizza','Vegetarian'),
+       (3, 'Pasta', 'Vegetarian'),
+       (3, 'Burger', 'Non-Vegetarian'),
+       (4, 'Salad', 'Vegan'),
+       (4, 'Pizza','Vegetarian'),
+       (5, 'Pasta', 'Vegetarian'),
+       (5, 'Burger', 'Non-Vegetarian'),
+       (6, 'Salad', 'Vegan'),
+       (6, 'Pizza','Vegetarian'),
+       (7, 'Pasta', 'Vegetarian'),
+       (7, 'Burger', 'Non-Vegetarian'),
+       (8, 'Salad', 'Vegan'),
+       (8, 'Pizza','Vegetarian');
