@@ -8,6 +8,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import time
 import csv
 
+
 def scrape_dining_halls():
     # Configure Chrome options for headless mode
     options = Options()
@@ -36,6 +37,7 @@ def scrape_dining_halls():
 
     return driver
 
+
 def wait_for_page_transition(driver, element_to_appear, timeout=20):
     """
     Wait for a specific element to appear after a page transition.
@@ -44,6 +46,7 @@ def wait_for_page_transition(driver, element_to_appear, timeout=20):
         EC.visibility_of_element_located(element_to_appear)
     )
     time.sleep(2)  # Adding a slight delay for stability
+
 
 def scrape_meals(driver):
     meal_times = ["Breakfast", "Lunch", "Dinner"]
@@ -119,6 +122,7 @@ def scrape_meals(driver):
                 print(f"Error scraping {meal_time} at {hall_name}: {e}")
                 continue
 
+
 def check_meal_items(driver):
     """
     Check if meal items are available on the page.
@@ -129,6 +133,7 @@ def check_meal_items(driver):
     except Exception as e:
         print(f"Error checking meal items: {e}")
         return False
+
 
 def expand_meal_items(driver):
     """
@@ -150,6 +155,7 @@ def expand_meal_items(driver):
 
     except Exception as e:
         print(f"Error expanding meal items: {e}")
+
 
 def scrape_nutritional_info(driver, hall_name, meal_time, csv_filename):
     """
@@ -185,7 +191,7 @@ def scrape_nutritional_info(driver, hall_name, meal_time, csv_filename):
                 }
 
                 # Find filter icons
-                filter_icons = item.find_elements(By.XPATH, "span[@class='pl-2']/img")
+                filter_icons = item.find_elements(By.XPATH, ".//span[@class='pl-2']/img")
                 for icon in filter_icons:
                     filter_name = icon.get_attribute("title")
                     if filter_name in filter_attributes:
@@ -198,45 +204,45 @@ def scrape_nutritional_info(driver, hall_name, meal_time, csv_filename):
                 # Extract meal name and nutrition info
                 meal_name, nutrition_info = get_nutritional_info(driver)
 
-                if meal_name and nutrition_info:
-                    nutrition_dict = parse_nutritional_info(nutrition_info)
-                    row = [hall_name, time.strftime('%Y-%m-%d'), meal_time, 
-                           meal_name, 
-                           nutrition_dict.get("Serving Size", "N/A"),
-                           nutrition_dict.get("Calories", "N/A"),
-                           nutrition_dict.get("Calories from Fat", "N/A"),
-                           nutrition_dict.get("Total Fat", "N/A"),
-                           nutrition_dict.get("Total Fat %", "N/A"),
-                           nutrition_dict.get("Saturated Fat", "N/A"),
-                           nutrition_dict.get("Saturated Fat %", "N/A"),
-                           nutrition_dict.get("Trans Fat", "N/A"),
-                           nutrition_dict.get("Cholesterol", "N/A"),
-                           nutrition_dict.get("Cholesterol %", "N/A"),
-                           nutrition_dict.get("Sodium", "N/A"),
-                           nutrition_dict.get("Sodium %", "N/A"),
-                           nutrition_dict.get("Potassium", "N/A"),
-                           nutrition_dict.get("Potassium %", "N/A"),
-                           nutrition_dict.get("Total Carbohydrates", "N/A"),
-                           nutrition_dict.get("Total Carbohydrates %", "N/A"),
-                           nutrition_dict.get("Dietary Fiber", "N/A"),
-                           nutrition_dict.get("Dietary Fiber %", "N/A"),
-                           nutrition_dict.get("Sugars", "N/A"),
-                           nutrition_dict.get("Protein", "N/A"),
-                           nutrition_dict.get("Protein %", "N/A"),
-                           nutrition_dict.get("Vitamin A %", "N/A"),
-                           nutrition_dict.get("Vitamin C %", "N/A"),
-                           nutrition_dict.get("Calcium %", "N/A"),
-                           nutrition_dict.get("Iron %", "N/A"),
-                           nutrition_dict.get("Vitamin D %", "N/A"),
-                           nutrition_dict.get("Ingredients", "N/A")]
+                # Write to CSV regardless of success in extracting all fields
+                nutrition_dict = parse_nutritional_info(nutrition_info) if nutrition_info else {}
+                row = [hall_name, time.strftime('%Y-%m-%d'), meal_time, 
+                       meal_name if meal_name else "N/A",
+                       nutrition_dict.get("Serving Size", "N/A"),
+                       nutrition_dict.get("Calories", "N/A"),
+                       nutrition_dict.get("Calories from Fat", "N/A"),
+                       nutrition_dict.get("Total Fat", "N/A"),
+                       nutrition_dict.get("Total Fat %", "N/A"),
+                       nutrition_dict.get("Saturated Fat", "N/A"),
+                       nutrition_dict.get("Saturated Fat %", "N/A"),
+                       nutrition_dict.get("Trans Fat", "N/A"),
+                       nutrition_dict.get("Cholesterol", "N/A"),
+                       nutrition_dict.get("Cholesterol %", "N/A"),
+                       nutrition_dict.get("Sodium", "N/A"),
+                       nutrition_dict.get("Sodium %", "N/A"),
+                       nutrition_dict.get("Potassium", "N/A"),
+                       nutrition_dict.get("Potassium %", "N/A"),
+                       nutrition_dict.get("Total Carbohydrates", "N/A"),
+                       nutrition_dict.get("Total Carbohydrates %", "N/A"),
+                       nutrition_dict.get("Dietary Fiber", "N/A"),
+                       nutrition_dict.get("Dietary Fiber %", "N/A"),
+                       nutrition_dict.get("Sugars", "N/A"),
+                       nutrition_dict.get("Protein", "N/A"),
+                       nutrition_dict.get("Protein %", "N/A"),
+                       nutrition_dict.get("Vitamin A %", "N/A"),
+                       nutrition_dict.get("Vitamin C %", "N/A"),
+                       nutrition_dict.get("Calcium %", "N/A"),
+                       nutrition_dict.get("Iron %", "N/A"),
+                       nutrition_dict.get("Vitamin D %", "N/A"),
+                       nutrition_dict.get("Ingredients", "N/A")]
 
-                    # Add filter attributes to the row
-                    row.extend([filter_attributes[filter] for filter in filter_attributes])
+                # Add filter attributes to the row
+                row.extend([filter_attributes[filter] for filter in filter_attributes])
 
-                    # Write the row to CSV immediately
-                    with open(csv_filename, mode='a', newline='', encoding='utf-8') as file:
-                        writer = csv.writer(file)
-                        writer.writerow(row)
+                # Write the row to CSV immediately
+                with open(csv_filename, mode='a', newline='', encoding='utf-8') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(row)
 
                 # Close the nutrition pop-up
                 close_button = WebDriverWait(driver, 10).until(
@@ -247,9 +253,18 @@ def scrape_nutritional_info(driver, hall_name, meal_time, csv_filename):
 
             except Exception as e:
                 print(f"Error scraping nutrition info for {item.text}: {e}")
+                # Write to CSV with only the available information if an error occurs
+                row = [hall_name, time.strftime('%Y-%m-%d'), meal_time, 
+                       item.text if item.text else "N/A",
+                       "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"]
+                row.extend([filter_attributes[filter] for filter in filter_attributes])
+                with open(csv_filename, mode='a', newline='', encoding='utf-8') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(row)
 
     except Exception as e:
         print(f"Error while scraping meal items: {e}")
+
 
 def get_nutritional_info(driver):
     """
@@ -261,15 +276,25 @@ def get_nutritional_info(driver):
         nutrition_info = {}
 
         # Extract serving size
-        serving_size_element = driver.find_element(By.CLASS_NAME, "cbo_nn_LabelBottomBorderLabel")
-        nutrition_info["Serving Size"] = serving_size_element.text.split(':')[1].strip()
+        try:
+            serving_size_element = driver.find_element(By.CLASS_NAME, "cbo_nn_LabelBottomBorderLabel")
+            nutrition_info["Serving Size"] = serving_size_element.text.split(':')[1].strip()
+        except:
+            nutrition_info["Serving Size"] = "N/A"
 
         # Extract calories and calories from fat
-        calories_row = driver.find_element(By.XPATH, "//td[contains(text(), 'Calories')]/../..")
-        cells = calories_row.find_elements(By.TAG_NAME, "td")
-        if len(cells) == 2:
-            nutrition_info["Calories"] = cells[0].find_element(By.CLASS_NAME, "cbo_nn_SecondaryNutrient").text.strip()
-            nutrition_info["Calories from Fat"] = cells[1].find_element(By.CLASS_NAME, "cbo_nn_SecondaryNutrient").text.strip()
+        try:
+            calories_row = driver.find_element(By.XPATH, "//td[contains(text(), 'Calories')]/../..")
+            cells = calories_row.find_elements(By.TAG_NAME, "td")
+            if len(cells) == 2:
+                nutrition_info["Calories"] = cells[0].find_element(By.CLASS_NAME, "cbo_nn_SecondaryNutrient").text.strip()
+                nutrition_info["Calories from Fat"] = cells[1].find_element(By.CLASS_NAME, "cbo_nn_SecondaryNutrient").text.strip()
+            else:
+                nutrition_info["Calories"] = "N/A"
+                nutrition_info["Calories from Fat"] = "N/A"
+        except:
+            nutrition_info["Calories"] = "N/A"
+            nutrition_info["Calories from Fat"] = "N/A"
 
         # Extract other nutrition information
         nutrient_rows = driver.find_elements(By.XPATH, "//table[@style='width:100%;']//tr")
@@ -295,26 +320,39 @@ def get_nutritional_info(driver):
         # Extract vitamin information (percent only)
         vitamin_rows = driver.find_elements(By.CLASS_NAME, "cbo_nn_SecondaryNutrientLabel")
         for vitamin_row in vitamin_rows:
-            vitamin_name = vitamin_row.text.strip()
-            vitamin_value = vitamin_row.find_element(By.XPATH, "following-sibling::td").text.strip()
-            if vitamin_value.endswith("%"):
-                nutrition_info[f"{vitamin_name} %"] = vitamin_value
+            try:
+                vitamin_name = vitamin_row.text.strip()
+                vitamin_value = vitamin_row.find_element(By.XPATH, "following-sibling::td").text.strip()
+                if vitamin_value.endswith("%"):
+                    nutrition_info[f"{vitamin_name} %"] = vitamin_value
+            except:
+                continue
 
         # Extract Vitamin D specifically if not captured earlier
-        vitamin_d_row = driver.find_elements(By.XPATH, "//tr[td[contains(text(), 'Vitamin D')]]")
-        if vitamin_d_row:
-            vitamin_d_cells = vitamin_d_row[0].find_elements(By.TAG_NAME, "td")
-            if len(vitamin_d_cells) == 2:
-                nutrition_info["Vitamin D %"] = vitamin_d_cells[1].text.strip()
+        try:
+            vitamin_d_row = driver.find_elements(By.XPATH, "//tr[td[contains(text(), 'Vitamin D')]]")
+            if vitamin_d_row:
+                vitamin_d_cells = vitamin_d_row[0].find_elements(By.TAG_NAME, "td")
+                if len(vitamin_d_cells) == 2:
+                    nutrition_info["Vitamin D %"] = vitamin_d_cells[1].text.strip()
+        except:
+            nutrition_info["Vitamin D %"] = "N/A"
 
         # Extract ingredients
-        ingredient_element = driver.find_element(By.CLASS_NAME, "cbo_nn_LabelIngredients")
-        nutrition_info["Ingredients"] = ingredient_element.text.strip()
+        try:
+            ingredient_element = driver.find_elements(By.CLASS_NAME, "cbo_nn_LabelIngredients")
+            if ingredient_element:
+                nutrition_info["Ingredients"] = ingredient_element[0].text.strip()
+            else:
+                nutrition_info["Ingredients"] = "N/A"
+        except:
+            nutrition_info["Ingredients"] = "N/A"
 
         return meal_name, nutrition_info
     except Exception as e:
         print(f"Error getting nutritional info: {e}")
         return None, None
+
 
 def parse_nutritional_info(nutrition_info):
     """
@@ -322,10 +360,12 @@ def parse_nutritional_info(nutrition_info):
     """
     return nutrition_info
 
+
 def main():
     driver = scrape_dining_halls()
     scrape_meals(driver)
     driver.quit()
+
 
 if __name__ == "__main__":
     main()
