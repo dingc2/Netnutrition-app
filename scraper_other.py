@@ -52,7 +52,7 @@ def scrape_meals(driver):
     # Initialize CSV with headers if it doesn't exist
     with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        writer.writerow(["Dining Hall", "Date", "Meal", "Food Name", "Serving Size", "Calories", "Calories from Fat", "Total Fat", "Total Fat %", "Saturated Fat", "Saturated Fat %", "Trans Fat", "Cholesterol", "Cholesterol %", "Sodium", "Sodium %", "Potassium", "Potassium %", "Total Carbohydrates", "Total Carbohydrates %", "Dietary Fiber", "Dietary Fiber %", "Sugars", "Protein", "Protein %", "Vitamin A %", "Vitamin C %", "Calcium %", "Iron %", "Vitamin D %", "Ingredients"])
+        writer.writerow(["Dining Hall", "Date", "Meal", "Food Name", "Serving Size", "Calories", "Calories from Fat", "Total Fat", "Total Fat %", "Saturated Fat", "Saturated Fat %", "Trans Fat", "Cholesterol", "Cholesterol %", "Sodium", "Sodium %", "Potassium", "Potassium %", "Total Carbohydrates", "Total Carbohydrates %", "Dietary Fiber", "Dietary Fiber %", "Sugars", "Protein", "Protein %", "Vitamin A %", "Vitamin C %", "Calcium %", "Iron %", "Vitamin D %", "Ingredients", "Alcohol", "Coconut", "Dairy", "Egg", "Fish", "Gluten", "Peanut", "Pork", "Sesame", "Shellfish", "Soy", "Tree Nut", "Cage Free Certified", "Certified Organic", "Halal", "Humanely Raised & Handled", "Kosher", "Local", "Vegan", "Vegetarian"])
 
     dining_halls_dropdown = WebDriverWait(driver, 15).until(
         EC.element_to_be_clickable((By.ID, "dropdownUnitButton"))
@@ -160,6 +160,37 @@ def scrape_nutritional_info(driver, hall_name, meal_time, csv_filename):
 
         for index, item in enumerate(meal_items):  # Removed the limit, will scrape all items
             try:
+                # Extract item attributes (filters)
+                filter_attributes = {
+                    "Alcohol": False,
+                    "Coconut": False,
+                    "Dairy": False,
+                    "Egg": False,
+                    "Fish": False,
+                    "Gluten": False,
+                    "Peanut": False,
+                    "Pork": False,
+                    "Sesame": False,
+                    "Shellfish": False,
+                    "Soy": False,
+                    "Tree Nut": False,
+                    "Cage Free Certified": False,
+                    "Certified Organic": False,
+                    "Halal": False,
+                    "Humanely Raised & Handled": False,
+                    "Kosher": False,
+                    "Local": False,
+                    "Vegan": False,
+                    "Vegetarian": False
+                }
+
+                # Find filter icons
+                filter_icons = item.find_elements(By.XPATH, "span[@class='pl-2']/img")
+                for icon in filter_icons:
+                    filter_name = icon.get_attribute("title")
+                    if filter_name in filter_attributes:
+                        filter_attributes[filter_name] = True
+
                 print(f"Clicking on item: {item.text}")
                 driver.execute_script("arguments[0].click();", item)  # Click the meal item
                 time.sleep(5)
@@ -198,6 +229,9 @@ def scrape_nutritional_info(driver, hall_name, meal_time, csv_filename):
                            nutrition_dict.get("Iron %", "N/A"),
                            nutrition_dict.get("Vitamin D %", "N/A"),
                            nutrition_dict.get("Ingredients", "N/A")]
+
+                    # Add filter attributes to the row
+                    row.extend([filter_attributes[filter] for filter in filter_attributes])
 
                     # Write the row to CSV immediately
                     with open(csv_filename, mode='a', newline='', encoding='utf-8') as file:
