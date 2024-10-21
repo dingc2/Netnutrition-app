@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button, ActivityIndicator, Linking } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { auth } from '../firebase';
 
 const DiningHalls = ({ navigation }) => {
     const [diningHalls, setDiningHalls] = useState([]);
@@ -27,6 +28,18 @@ const DiningHalls = ({ navigation }) => {
         }
     };
 
+    const handleProfilePress = () => {
+        const user = auth.currentUser;
+        if (user) {
+            navigation.navigate('ProfileDetails', {
+                name: user.displayName || 'User',
+                email: user.email
+            });
+        } else {
+            navigation.navigate('ProfileScreen');
+        }
+    };
+
     const checkIfOpen = (hours) => {
         if (!hours || hours.length === 0) return false;
 
@@ -41,6 +54,10 @@ const DiningHalls = ({ navigation }) => {
         return false;
     };
 
+    const openWaitTimes = () => {
+        Linking.openURL('https://campusdining.vanderbilt.edu/wait-times/');
+    };
+
     if (loading) {
         return (
             <View style={[styles.container, styles.centered]}>
@@ -51,15 +68,21 @@ const DiningHalls = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Available Dining Halls</Text>
-                <TouchableOpacity
-                    style={styles.profileButton}
-                    onPress={() => navigation.navigate('ProfileScreen')}
-                >
+            {/* Nav Bar */}
+            <View style={styles.navBar}>
+                <TouchableOpacity onPress={openWaitTimes} style={styles.navButton}>
+                    <Text style={styles.linkText}>See Current Wait Times</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleProfilePress} style={styles.navButton}>
                     <Icon name="user" size={24} color="#000" />
+                    <Text style={styles.navText}>Profile</Text>
+                    {auth.currentUser && (
+                        <View style={styles.authIndicator} />
+                    )}
                 </TouchableOpacity>
             </View>
+
+            {/* Dining Halls List */}
             <FlatList
                 data={diningHalls}
                 keyExtractor={(item) => item.id.toString()}
@@ -109,18 +132,35 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: '#99773d',
     },
-    header: {
+    navBar: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        paddingBottom: 20,
     },
-    title: {
-        fontSize: 24,
+    navButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    navText: {
+        fontSize: 16,
         fontWeight: 'bold',
+        marginLeft: 10,
     },
-    profileButton: {
-        padding: 10,
+    linkText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#00008B', 
+        textDecorationLine: 'underline', 
+    },
+    authIndicator: {
+        position: 'absolute',
+        top: 15,
+        right: 60,
+        width: 8,
+        height: 8,
+        backgroundColor: '#4CAF50',
+        borderRadius: 4,
     },
     item: {
         padding: 15,

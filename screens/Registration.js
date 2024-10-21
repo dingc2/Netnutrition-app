@@ -1,33 +1,42 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { auth } from '../firebase';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 
 const RegisterScreen = ({ navigation }) => {
-    const [username, setUsername] = useState('');
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleRegister = () => {
-        // Basic form validation
-        if (!username || !name || !email || !password) {
+    const handleRegister = async () => {
+        if (!name || !email || !password) {
             Alert.alert('Error', 'Please fill out all fields.');
             return;
         }
 
-        Alert.alert('Success', 'Registration successful! Please log in.');
+        try {
+            setLoading(true);
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+            
+            // Update user profile with display name
+            await updateProfile(user, {
+                displayName: name
+            });
 
-        navigation.navigate('Login', { name });
+            Alert.alert('Success', 'Registration successful! Please log in.');
+            navigation.navigate('Login', { name });
+        } catch (error) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Register</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Username"
-                value={username}
-                onChangeText={setUsername}
-            />
             <TextInput
                 style={styles.input}
                 placeholder="Name"
@@ -49,7 +58,11 @@ const RegisterScreen = ({ navigation }) => {
                 onChangeText={setPassword}
                 secureTextEntry={true}
             />
-            <Button title="Register" onPress={handleRegister} />
+            <Button 
+                title={loading ? "Loading..." : "Register"}
+                onPress={handleRegister}
+                disabled={loading}
+            />
             <Text style={styles.loginPrompt}>
                 Already have an account? <Text onPress={() => navigation.navigate('Login')} style={styles.link}>Login here</Text>
             </Text>
