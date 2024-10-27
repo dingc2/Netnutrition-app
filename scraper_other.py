@@ -4,12 +4,28 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import ElementClickInterceptedException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import csv
+import os
+import threading
 
+# Cache to store previously scraped nutritional information
+nutrition_cache = {}
 
-def scrape_dining_halls():
+# Load existing nutrition data into cache
+nutrition_csv_filename = "nutrition_info.csv"
+if os.path.exists(nutrition_csv_filename):
+    with open(nutrition_csv_filename, mode='r', newline='', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            nutrition_cache[row["Food Name"]] = row
+
+# Create a lock object for thread-safe CSV writing
+write_lock = threading.Lock()
+
+def create_driver():
     # Configure Chrome options for headless mode
     options = Options()
     # options.add_argument("--headless")  # Run Chrome in headless mode
@@ -33,10 +49,35 @@ def scrape_dining_halls():
     except Exception as e:
         print(f"An error occurred while closing the pop-up: {e}")
 
-    time.sleep(3)  # Wait for the page to fully load
+    time.sleep(0.5)  # Wait for the page to fully load
 
     return driver
 
+def wait_and_click(driver, by_locator, retries=3):
+    """
+    Wait for an element to be clickable and attempt to click it with retries.
+    """
+    for _ in range(retries):
+        try:
+            element = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable(by_locator)
+            )
+            driver.execute_script("arguments[0].scrollIntoView(true);", element)
+            element.click()
+            return True
+        except ElementClickInterceptedException:
+            # Handle modals if they're blocking
+            try:
+                close_buttons = driver.find_elements(By.XPATH, "//button[contains(@id, 'btn_nn_nutrition_close')]")
+                for button in close_buttons:
+                    if button.is_displayed():
+                        button.click()
+                        WebDriverWait(driver, 10).until(EC.invisibility_of_element(button))
+            except Exception as e:
+                print(f"Error ensuring modal is closed: {e}")
+
+            time.sleep(0.5)  # Small delay before retrying
+    return False
 
 def wait_for_page_transition(driver, element_to_appear, timeout=20):
     """
@@ -45,83 +86,110 @@ def wait_for_page_transition(driver, element_to_appear, timeout=20):
     WebDriverWait(driver, timeout).until(
         EC.visibility_of_element_located(element_to_appear)
     )
-    time.sleep(2)  # Adding a slight delay for stability
+    time.sleep(1)  # Adding a slight delay for stability
 
-
-def scrape_meals(driver):
-    meal_times = ["Breakfast", "Lunch", "Dinner"]
+def scrape_meals_for_hall(hall_index, hall_name):
+    driver = create_driver()
     csv_filename = "dining_meals_nutrition.csv"
 
-    # Initialize CSV with headers if it doesn't exist
-    with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        writer.writerow(["Dining Hall", "Date", "Meal", "Food Name", "Serving Size", "Calories", "Calories from Fat", "Total Fat", "Total Fat %", "Saturated Fat", "Saturated Fat %", "Trans Fat", "Cholesterol", "Cholesterol %", "Sodium", "Sodium %", "Potassium", "Potassium %", "Total Carbohydrates", "Total Carbohydrates %", "Dietary Fiber", "Dietary Fiber %", "Sugars", "Protein", "Protein %", "Vitamin A %", "Vitamin C %", "Calcium %", "Iron %", "Vitamin D %", "Ingredients", "Alcohol", "Coconut", "Dairy", "Egg", "Fish", "Gluten", "Peanut", "Pork", "Sesame", "Shellfish", "Soy", "Tree Nut", "Cage Free Certified", "Certified Organic", "Halal", "Humanely Raised & Handled", "Kosher", "Local", "Vegan", "Vegetarian"])
-
-    dining_halls_dropdown = WebDriverWait(driver, 15).until(
-        EC.element_to_be_clickable((By.ID, "dropdownUnitButton"))
-    )
-   
-    # Get all dining halls (excluding 'Show All Units')
-    dining_halls = driver.find_elements(By.XPATH, "//a[@data-unitoid!='-1']")
-   
-    # Iterate over all dining halls
-    for hall_index, hall in enumerate(dining_halls):
+    try:
         # Click dropdown to open dining halls list for each iteration
-        dining_halls_dropdown.click()
+        if not wait_and_click(driver, (By.ID, "dropdownUnitButton")):
+            print("Failed to click dining halls dropdown.")
+            return
+
         print("Dining halls dropdown clicked!")
 
-        # Refresh the dining halls element list because DOM may update
-        dining_halls = driver.find_elements(By.XPATH, "//a[@data-unitoid!='-1']")
-       
+        # Retry mechanism for refreshing the dining halls element list
+        retries = 3
+        dining_halls = []
+        for attempt in range(retries):
+            dining_halls = driver.find_elements(By.XPATH, "//a[@data-unitoid!='-1']")
+            if len(dining_halls) > 0:
+                break
+            print(f"Attempt {attempt + 1} to load dining halls failed, retrying...")
+            time.sleep(2)
+
+        if len(dining_halls) == 0:
+            print("Failed to load dining halls after retries.")
+            return
+
         # Click on the current dining hall
         hall = dining_halls[hall_index]
-        hall_name = hall.get_attribute("title")
-       
-        try:
-            hall.click()
-            print(f"Clicked on dining hall: {hall_name}")
-            # Wait for the dining hall page to load completely (update this selector to a unique element on the page)
-            wait_for_page_transition(driver, (By.ID, "cbo_nn_HeaderSelectedUnit"))
-        except Exception as e:
-            print(f"Error clicking on {hall_name}: {e}")
-            continue
+        hall.click()
+        print(f"Clicked on dining hall: {hall_name}")
+        wait_for_page_transition(driver, (By.ID, "cbo_nn_HeaderSelectedUnit"))
 
-        time.sleep(3)  # Give time for the dining hall to load properly
+        time.sleep(1)  # Give time for the dining hall to load properly
 
-        # Iterate over all meal times
-        for meal_time in meal_times:
+        # Iterate over all available dates
+        if not wait_and_click(driver, (By.ID, "dropdownDateButton")):
+            print("Failed to click date dropdown.")
+            return
+
+        print("Date dropdown clicked!")
+
+        # Retry mechanism for date selection
+        dates = driver.find_elements(By.XPATH, "//a[@data-type='DT' and @data-date!='Show All Dates']")
+        date_values = [date.get_attribute("data-date") for date in dates]
+
+        if not date_values:
+            print(f"No dates available for dining hall: {hall_name}")
+
+        for date_value in date_values:
             try:
-                # Click meal dropdown
-                meal_dropdown = WebDriverWait(driver, 15).until(
-                    EC.element_to_be_clickable((By.ID, "dropdownMealButton"))
-                )
-                meal_dropdown.click()
-                print(f"Clicked meal dropdown for {meal_time}")
-
-                meal_option = WebDriverWait(driver, 15).until(
-                    EC.element_to_be_clickable((By.XPATH, f"//a[@title='{meal_time}']"))
-                )
-                meal_option.click()
-                print(f"Selected {meal_time}")
-
-                time.sleep(5)
-
-                # Check if there are meal items available
-                if check_meal_items(driver):
-                    print(f"Meal items found for {meal_time} at {hall_name}")
-                    # Expand the whole meal item table before scraping
-                    expand_meal_items(driver)
-
-                    # Now scrape the nutritional info for all items
-                    scrape_nutritional_info(driver, hall_name, meal_time, csv_filename)
-                else:
-                    print(f"No meal items available for {meal_time} at {hall_name}, skipping.")
+                if not wait_and_click(driver, (By.ID, "dropdownDateButton")):
+                    print(f"Failed to click date dropdown for date: {date_value}")
                     continue
 
+                date_option = WebDriverWait(driver, 15).until(
+                    EC.element_to_be_clickable((By.XPATH, f"//a[@data-date='{date_value}']"))
+                )
+                date_option.click()
+                print(f"Selected date: {date_value}")
+
+                time.sleep(1)  # Wait for the date to be applied
+
+                meal_times = ["Breakfast", "Lunch", "Dinner", "Daily Offerings", "Brunch"]
+
+                # Iterate over all meal times
+                for meal_time in meal_times:
+                    try:
+                        if not wait_and_click(driver, (By.ID, "dropdownMealButton")):
+                            print(f"Failed to click meal dropdown for meal: {meal_time}")
+                            continue
+
+                        meal_option = WebDriverWait(driver, 15).until(
+                            EC.element_to_be_clickable((By.XPATH, f"//a[@title='{meal_time}']"))
+                        )
+                        meal_option.click()
+                        print(f"Selected {meal_time}")
+
+                        time.sleep(1)  # Allow time for meal content to load
+
+                        # Check if there are meal items available
+                        if check_meal_items(driver):
+                            print(f"Meal items found for {meal_time} at {hall_name} on {date_value}")
+                            expand_meal_items(driver)
+                            scrape_nutritional_info(driver, hall_name, meal_time, date_value, csv_filename)
+                        else:
+                            print(f"No meal items available for {meal_time} at {hall_name} on {date_value}, skipping.")
+
+                    except Exception as e:
+                        print(f"Error scraping {meal_time} at {hall_name} on {date_value}: {e}")
+                        continue
+
             except Exception as e:
-                print(f"Error scraping {meal_time} at {hall_name}: {e}")
+                print(f"Error selecting date {date_value} for {hall_name}: {e}")
                 continue
 
+    except Exception as e:
+        print(f"Error scraping dining hall {hall_name}: {e}")
+    finally:
+        try:
+            driver.quit()
+        except Exception as e:
+            print(f"Error while quitting the driver: {e}")
 
 def check_meal_items(driver):
     """
@@ -134,7 +202,6 @@ def check_meal_items(driver):
         print(f"Error checking meal items: {e}")
         return False
 
-
 def expand_meal_items(driver):
     """
     Expands the entire table holding the meal items by clicking all collapsible sections.
@@ -144,11 +211,20 @@ def expand_meal_items(driver):
 
         for group in item_groups:
             try:
+                # Extract group (category) name
+                category_name = group.find_element(By.XPATH, ".//div[@role='button']").text.strip()
+
                 # Expand if it's collapsed (aria-expanded is "false")
                 if group.get_attribute("aria-expanded") == "false":
                     group.click()
-                    time.sleep(1)  # Give time for items to load after expanding
-                    print("Expanded a meal item group")
+                    time.sleep(0.5)  # Give time for items to load after expanding
+                    print(f"Expanded a meal item group: {category_name}")
+
+                # Attach category name to the elements within this group
+                meal_items = group.find_elements(By.XPATH, "following-sibling::tr[contains(@class, 'cbo_nn_itemPrimaryRow')]")
+                for item in meal_items:
+                    driver.execute_script("arguments[0].setAttribute('data-category', arguments[1]);", item, category_name)
+
             except Exception as e:
                 print(f"Error while expanding a meal group: {e}")
                 continue
@@ -156,115 +232,118 @@ def expand_meal_items(driver):
     except Exception as e:
         print(f"Error expanding meal items: {e}")
 
-
-def scrape_nutritional_info(driver, hall_name, meal_time, csv_filename):
+def scrape_nutritional_info(driver, hall_name, meal_time, date_value, csv_filename):
     """
     Scrape the nutritional info by clicking each meal item and fetching data from the pop-up.
     """
     try:
-        meal_items = driver.find_elements(By.XPATH, ".//a[contains(@class, 'cbo_nn_itemHover')]")
+        # Get all rows in the meal table (including category and item rows)
+        meal_rows = driver.find_elements(By.XPATH, ".//tr[contains(@class, 'cbo_nn_item')]")
 
-        for index, item in enumerate(meal_items):  # Removed the limit, will scrape all items
-            try:
-                # Extract item attributes (filters)
-                filter_attributes = {
-                    "Alcohol": False,
-                    "Coconut": False,
-                    "Dairy": False,
-                    "Egg": False,
-                    "Fish": False,
-                    "Gluten": False,
-                    "Peanut": False,
-                    "Pork": False,
-                    "Sesame": False,
-                    "Shellfish": False,
-                    "Soy": False,
-                    "Tree Nut": False,
-                    "Cage Free Certified": False,
-                    "Certified Organic": False,
-                    "Halal": False,
-                    "Humanely Raised & Handled": False,
-                    "Kosher": False,
-                    "Local": False,
-                    "Vegan": False,
-                    "Vegetarian": False
-                }
+        current_category = None
 
-                # Find filter icons
-                filter_icons = item.find_elements(By.XPATH, ".//span[@class='pl-2']/img")
-                for icon in filter_icons:
-                    filter_name = icon.get_attribute("title")
-                    if filter_name in filter_attributes:
-                        filter_attributes[filter_name] = True
+        for row in meal_rows:
+            # Check if the row is a category row (cbo_nn_itemGroupRow)
+            if 'cbo_nn_itemGroupRow' in row.get_attribute('class'):
+                try:
+                    # Extract category name
+                    current_category = row.find_element(By.XPATH, ".//div[@role='button']").text.strip()
+                    print(f"New category detected: {current_category}")
+                except Exception as e:
+                    print(f"Error extracting category: {e}")
+                    current_category = "Unknown"
+            # Check if the row is an item row (cbo_nn_itemPrimaryRow or cbo_nn_itemAlternateRow)
+            elif 'cbo_nn_itemPrimaryRow' in row.get_attribute('class') or 'cbo_nn_itemAlternateRow' in row.get_attribute('class'):
+                try:
+                    # Extract item details
+                    item_name_element = row.find_element(By.XPATH, ".//a[contains(@class, 'cbo_nn_itemHover')]")
+                    item_name = item_name_element.text.strip()
 
-                print(f"Clicking on item: {item.text}")
-                driver.execute_script("arguments[0].click();", item)  # Click the meal item
-                time.sleep(5)
+                    # Extract item attributes (filters)
+                    filter_attributes = {
+                        "Alcohol": False,
+                        "Coconut": False,
+                        "Dairy": False,
+                        "Egg": False,
+                        "Fish": False,
+                        "Gluten": False,
+                        "Peanut": False,
+                        "Pork": False,
+                        "Sesame": False,
+                        "Shellfish": False,
+                        "Soy": False,
+                        "Tree Nut": False,
+                        "Cage Free Certified": False,
+                        "Certified Organic": False,
+                        "Halal": False,
+                        "Humanely Raised & Handled": False,
+                        "Kosher": False,
+                        "Local": False,
+                        "Vegan": False,
+                        "Vegetarian": False
+                    }
 
-                # Extract meal name and nutrition info
-                meal_name, nutrition_info = get_nutritional_info(driver)
+                    # Find filter icons
+                    filter_icons = item_name_element.find_elements(By.XPATH, ".//span[@class='pl-2']/img")
+                    for icon in filter_icons:
+                        filter_name = icon.get_attribute("title")
+                        if filter_name in filter_attributes:
+                            filter_attributes[filter_name] = True
 
-                # Write to CSV regardless of success in extracting all fields
-                nutrition_dict = parse_nutritional_info(nutrition_info) if nutrition_info else {}
-                row = [hall_name, time.strftime('%Y-%m-%d'), meal_time, 
-                       meal_name if meal_name else "N/A",
-                       nutrition_dict.get("Serving Size", "N/A"),
-                       nutrition_dict.get("Calories", "N/A"),
-                       nutrition_dict.get("Calories from Fat", "N/A"),
-                       nutrition_dict.get("Total Fat", "N/A"),
-                       nutrition_dict.get("Total Fat %", "N/A"),
-                       nutrition_dict.get("Saturated Fat", "N/A"),
-                       nutrition_dict.get("Saturated Fat %", "N/A"),
-                       nutrition_dict.get("Trans Fat", "N/A"),
-                       nutrition_dict.get("Cholesterol", "N/A"),
-                       nutrition_dict.get("Cholesterol %", "N/A"),
-                       nutrition_dict.get("Sodium", "N/A"),
-                       nutrition_dict.get("Sodium %", "N/A"),
-                       nutrition_dict.get("Potassium", "N/A"),
-                       nutrition_dict.get("Potassium %", "N/A"),
-                       nutrition_dict.get("Total Carbohydrates", "N/A"),
-                       nutrition_dict.get("Total Carbohydrates %", "N/A"),
-                       nutrition_dict.get("Dietary Fiber", "N/A"),
-                       nutrition_dict.get("Dietary Fiber %", "N/A"),
-                       nutrition_dict.get("Sugars", "N/A"),
-                       nutrition_dict.get("Protein", "N/A"),
-                       nutrition_dict.get("Protein %", "N/A"),
-                       nutrition_dict.get("Vitamin A %", "N/A"),
-                       nutrition_dict.get("Vitamin C %", "N/A"),
-                       nutrition_dict.get("Calcium %", "N/A"),
-                       nutrition_dict.get("Iron %", "N/A"),
-                       nutrition_dict.get("Vitamin D %", "N/A"),
-                       nutrition_dict.get("Ingredients", "N/A")]
+                    # Check if the item is already in cache
+                    if item_name in nutrition_cache:
+                        print(f"Using cached data for item: {item_name}")
+                        nutrition_info = nutrition_cache[item_name]
+                        food_id = nutrition_info["Food ID"]
+                    else:
+                        # Click to open nutritional information
+                        try:
+                            print(f"Clicking on item: {item_name}")
+                            driver.execute_script("arguments[0].click();", item_name_element)
+                            time.sleep(0.5)
 
-                # Add filter attributes to the row
-                row.extend([filter_attributes[filter] for filter in filter_attributes])
+                            # Extract meal name and nutrition info
+                            meal_name, nutrition_info = get_nutritional_info(driver)
 
-                # Write the row to CSV immediately
-                with open(csv_filename, mode='a', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(row)
+                            # Assign a new Food ID and add the nutritional information to cache
+                            food_id = len(nutrition_cache) + 1
+                            nutrition_info["Food ID"] = food_id
+                            nutrition_cache[item_name] = nutrition_info
 
-                # Close the nutrition pop-up
-                close_button = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.ID, "btn_nn_nutrition_close"))
-                )
-                close_button.click()
-                time.sleep(2)
+                            # Save the nutritional information to the nutrition CSV if not already saved
+                            with write_lock:
+                                with open(nutrition_csv_filename, mode='a', newline='', encoding='utf-8') as file:
+                                    writer = csv.writer(file)
+                                    if file.tell() == 0:
+                                        # Write header if the file is empty
+                                        writer.writerow(["Food ID", "Food Name", "Serving Size", "Calories", "Calories from Fat", "Total Fat", "Total Fat %", "Saturated Fat", "Saturated Fat %", "Trans Fat", "Cholesterol", "Cholesterol %", "Sodium", "Sodium %", "Potassium", "Potassium %", "Total Carbohydrates", "Total Carbohydrates %", "Dietary Fiber", "Dietary Fiber %", "Sugars", "Protein", "Protein %", "Vitamin A %", "Vitamin C %", "Calcium %", "Iron %", "Vitamin D %", "Ingredients", "Alcohol", "Coconut", "Dairy", "Egg", "Fish", "Gluten", "Peanut", "Pork", "Sesame", "Shellfish", "Soy", "Tree Nut", "Cage Free Certified", "Certified Organic", "Halal", "Humanely Raised & Handled", "Kosher", "Local", "Vegan", "Vegetarian"])
+                                    writer.writerow([food_id, item_name] + list(nutrition_info.values()) + list(filter_attributes.values()))
 
-            except Exception as e:
-                print(f"Error scraping nutrition info for {item.text}: {e}")
-                # Write to CSV with only the available information if an error occurs
-                row = [hall_name, time.strftime('%Y-%m-%d'), meal_time, 
-                       item.text if item.text else "N/A",
-                       "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"]
-                row.extend([filter_attributes[filter] for filter in filter_attributes])
-                with open(csv_filename, mode='a', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(row)
+                        except Exception as e:
+                            print(f"Error scraping nutrition info for {item_name}: {e}")
+                            continue
+
+                    # Write to dining_meals_nutrition CSV
+                    with write_lock:
+                        with open(csv_filename, mode='a', newline='', encoding='utf-8') as file:
+                            writer = csv.writer(file)
+                            writer.writerow([food_id, hall_name, date_value, meal_time, item_name, current_category])
+
+                    # Close the nutrition pop-up if it's open
+                    try:
+                        close_button = driver.find_element(By.ID, "btn_nn_nutrition_close")
+                        if close_button.is_displayed():
+                            close_button.click()
+                            time.sleep(1)
+                    except Exception:
+                        pass
+
+                except Exception as e:
+                    print(f"Error scraping meal item: {e}")
+                    continue
 
     except Exception as e:
         print(f"Error while scraping meal items: {e}")
-
 
 def get_nutritional_info(driver):
     """
@@ -299,6 +378,10 @@ def get_nutritional_info(driver):
         # Extract other nutrition information
         nutrient_rows = driver.find_elements(By.XPATH, "//table[@style='width:100%;']//tr")
         for row in nutrient_rows:
+            # Skip the row if it contains calories information to prevent re-adding it
+            if "Calories" in row.text:
+                continue
+
             cells = row.find_elements(By.TAG_NAME, "td")
             if len(cells) == 3:
                 nutrient_name = cells[0].text.strip()
@@ -353,19 +436,44 @@ def get_nutritional_info(driver):
         print(f"Error getting nutritional info: {e}")
         return None, None
 
-
 def parse_nutritional_info(nutrition_info):
     """
     Parse the nutritional information text into a dictionary.
     """
     return nutrition_info
 
-
 def main():
-    driver = scrape_dining_halls()
-    scrape_meals(driver)
+    start_time = time.time()
+
+    # Create initial driver to get the list of dining halls
+    driver = create_driver()
+    if wait_and_click(driver, (By.ID, "dropdownUnitButton")):
+        print("Dining halls dropdown clicked!")
+    else:
+        print("Failed to click dining halls dropdown.")
+        return
+
+    # Get all dining halls (excluding 'Show All Units')
+    dining_halls = driver.find_elements(By.XPATH, "//a[@data-unitoid!='-1']")
+    dining_hall_names = [hall.get_attribute("title") for hall in dining_halls]
+
     driver.quit()
 
+    # Recreate the CSV file to start with a blank file for each new run
+    csv_filename = "dining_meals_nutrition.csv"
+    if os.path.exists(csv_filename):
+        os.remove(csv_filename)
+    with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Food ID", "Dining Hall", "Date", "Meal", "Food Name", "Category"])
+
+    # Scrape each dining hall sequentially
+    for i, name in enumerate(dining_hall_names):
+        scrape_meals_for_hall(i, name)
+
+    end_time = time.time()
+    total_time = end_time - start_time
+    print(f"Total runtime: {total_time:.2f} seconds")
 
 if __name__ == "__main__":
     main()
