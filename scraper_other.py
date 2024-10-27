@@ -6,6 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import ElementClickInterceptedException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
+import concurrent.futures
 import time
 import csv
 import os
@@ -53,13 +54,13 @@ def create_driver():
 
     return driver
 
-def wait_and_click(driver, by_locator, retries=3):
+def wait_and_click(driver, by_locator, retries=5):
     """
     Wait for an element to be clickable and attempt to click it with retries.
     """
-    for _ in range(retries):
+    for attempt in range(retries):
         try:
-            element = WebDriverWait(driver, 10).until(
+            element = WebDriverWait(driver, 15).until(
                 EC.element_to_be_clickable(by_locator)
             )
             driver.execute_script("arguments[0].scrollIntoView(true);", element)
@@ -76,8 +77,10 @@ def wait_and_click(driver, by_locator, retries=3):
             except Exception as e:
                 print(f"Error ensuring modal is closed: {e}")
 
-            time.sleep(0.5)  # Small delay before retrying
+            time.sleep(1)  # Small delay before retrying
+            print(f"Retrying click for {by_locator}. Attempt {attempt + 1}")
     return False
+
 
 def wait_for_page_transition(driver, element_to_appear, timeout=20):
     """
@@ -101,14 +104,14 @@ def scrape_meals_for_hall(hall_index, hall_name):
         print("Dining halls dropdown clicked!")
 
         # Retry mechanism for refreshing the dining halls element list
-        retries = 3
+        retries = 5
         dining_halls = []
         for attempt in range(retries):
             dining_halls = driver.find_elements(By.XPATH, "//a[@data-unitoid!='-1']")
             if len(dining_halls) > 0:
                 break
             print(f"Attempt {attempt + 1} to load dining halls failed, retrying...")
-            time.sleep(2)
+            time.sleep(3)
 
         if len(dining_halls) == 0:
             print("Failed to load dining halls after retries.")
@@ -120,7 +123,7 @@ def scrape_meals_for_hall(hall_index, hall_name):
         print(f"Clicked on dining hall: {hall_name}")
         wait_for_page_transition(driver, (By.ID, "cbo_nn_HeaderSelectedUnit"))
 
-        time.sleep(1)  # Give time for the dining hall to load properly
+        time.sleep(2)  # Give time for the dining hall to load properly
 
         # Iterate over all available dates
         if not wait_and_click(driver, (By.ID, "dropdownDateButton")):
@@ -137,51 +140,54 @@ def scrape_meals_for_hall(hall_index, hall_name):
             print(f"No dates available for dining hall: {hall_name}")
 
         for date_value in date_values:
-            try:
-                if not wait_and_click(driver, (By.ID, "dropdownDateButton")):
-                    print(f"Failed to click date dropdown for date: {date_value}")
-                    continue
-
-                date_option = WebDriverWait(driver, 15).until(
-                    EC.element_to_be_clickable((By.XPATH, f"//a[@data-date='{date_value}']"))
-                )
-                date_option.click()
-                print(f"Selected date: {date_value}")
-
-                time.sleep(1)  # Wait for the date to be applied
-
-                meal_times = ["Breakfast", "Lunch", "Dinner", "Daily Offerings", "Brunch"]
-
-                # Iterate over all meal times
-                for meal_time in meal_times:
-                    try:
-                        if not wait_and_click(driver, (By.ID, "dropdownMealButton")):
-                            print(f"Failed to click meal dropdown for meal: {meal_time}")
-                            continue
-
-                        meal_option = WebDriverWait(driver, 15).until(
-                            EC.element_to_be_clickable((By.XPATH, f"//a[@title='{meal_time}']"))
-                        )
-                        meal_option.click()
-                        print(f"Selected {meal_time}")
-
-                        time.sleep(1)  # Allow time for meal content to load
-
-                        # Check if there are meal items available
-                        if check_meal_items(driver):
-                            print(f"Meal items found for {meal_time} at {hall_name} on {date_value}")
-                            expand_meal_items(driver)
-                            scrape_nutritional_info(driver, hall_name, meal_time, date_value, csv_filename)
-                        else:
-                            print(f"No meal items available for {meal_time} at {hall_name} on {date_value}, skipping.")
-
-                    except Exception as e:
-                        print(f"Error scraping {meal_time} at {hall_name} on {date_value}: {e}")
+            for attempt in range(retries):
+                try:
+                    if not wait_and_click(driver, (By.ID, "dropdownDateButton")):
+                        print(f"Failed to click date dropdown for date: {date_value}")
                         continue
 
-            except Exception as e:
-                print(f"Error selecting date {date_value} for {hall_name}: {e}")
-                continue
+                    date_option = WebDriverWait(driver, 20).until(
+                        EC.visibility_of_element_located((By.XPATH, f"//a[@data-date='{date_value}']"))
+                    )
+                    driver.execute_script("arguments[0].click();", date_option)
+                    print(f"Selected date: {date_value}")
+                    break
+                except TimeoutException:
+                    print(f"Attempt {attempt + 1} to click on date {date_value} failed, retrying...")
+                    time.sleep(2)
+                    if attempt == retries - 1:
+                        raise
+
+            time.sleep(2)  # Wait for the date to be applied
+
+            meal_times = ["Breakfast", "Lunch", "Dinner", "Daily Offerings", "Brunch"]
+
+            # Iterate over all meal times
+            for meal_time in meal_times:
+                try:
+                    if not wait_and_click(driver, (By.ID, "dropdownMealButton")):
+                        print(f"Failed to click meal dropdown for meal: {meal_time}")
+                        continue
+
+                    meal_option = WebDriverWait(driver, 20).until(
+                        EC.element_to_be_clickable((By.XPATH, f"//a[@title='{meal_time}']"))
+                    )
+                    meal_option.click()
+                    print(f"Selected {meal_time}")
+
+                    time.sleep(2)  # Allow time for meal content to load
+
+                    # Check if there are meal items available
+                    if check_meal_items(driver):
+                        print(f"Meal items found for {meal_time} at {hall_name} on {date_value}")
+                        expand_meal_items(driver)
+                        scrape_nutritional_info(driver, hall_name, meal_time, date_value, csv_filename)
+                    else:
+                        print(f"No meal items available for {meal_time} at {hall_name} on {date_value}, skipping.")
+
+                except Exception as e:
+                    print(f"Error scraping {meal_time} at {hall_name} on {date_value}: {e}")
+                    continue
 
     except Exception as e:
         print(f"Error scraping dining hall {hall_name}: {e}")
@@ -190,6 +196,7 @@ def scrape_meals_for_hall(hall_index, hall_name):
             driver.quit()
         except Exception as e:
             print(f"Error while quitting the driver: {e}")
+
 
 def check_meal_items(driver):
     """
@@ -467,9 +474,10 @@ def main():
         writer = csv.writer(file)
         writer.writerow(["Food ID", "Dining Hall", "Date", "Meal", "Food Name", "Category"])
 
-    # Scrape each dining hall sequentially
-    for i, name in enumerate(dining_hall_names):
-        scrape_meals_for_hall(i, name)
+    # Use ThreadPoolExecutor to scrape each dining hall in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(scrape_meals_for_hall, i, name) for i, name in enumerate(dining_hall_names)]
+        concurrent.futures.wait(futures)
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -477,3 +485,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
