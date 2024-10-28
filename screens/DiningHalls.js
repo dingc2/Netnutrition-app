@@ -1,298 +1,107 @@
-import React from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button, ActivityIndicator, Linking } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-
-const diningHalls = [
-    {
-        id: '1',
-        name: 'Rothschild',
-        isOpen: true,
-        hours: [
-            { day: 'Sunday', open: '12:00 PM', close: '4:00 PM' },
-            { day: 'Sunday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Monday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Monday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Tuesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Tuesday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Wednesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Wednesday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Thursday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Thursday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Friday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Saturday', open: 'Closed', close: 'Closed' },
-            { day: 'Sunday', open: '8:00 AM', close: '11:00 AM' },
-        ],
-        menu: [
-            { id: '1', name: 'Pizza' },
-            { id: '2', name: 'Salad' },
-            { id: '3', name: 'Burger'},
-        ]
-    },
-
-    {
-        id: '2',
-        name: 'Commons',
-        isOpen: false,
-        hours: [
-            { day: 'Sunday', open: '12:00 PM', close: '4:00 PM' },
-            { day: 'Sunday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Monday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Monday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Monday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Tuesday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Tuesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Tuesday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Wednesday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Wednesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Wednesday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Thursday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Thursday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Thursday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Friday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Friday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Friday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Saturday', open: '8:00 AM', close: '11:00 AM' },
-            { day: 'Saturday', open: '12:00 PM', close: '4:00 PM' },
-            { day: 'Saturday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Sunday', open: '8:00 AM', close: '11:00 AM' }
-        ],
-        menu: [
-            { id: '1', name: 'Pizza' },
-            { id: '2', name: 'Salad' },
-            { id: '3', name: 'Pasta'},
-        ]
-    },
-
-    {
-        id: '3',
-        name: 'Zeppos',
-        isOpen: true,
-        hours: [
-            { day: 'Sunday', open: '12:00 PM', close: '4:00 PM' },
-            { day: 'Sunday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Monday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Monday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Tuesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Tuesday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Wednesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Wednesday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Thursday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Thursday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Friday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Saturday', open: 'Closed', close: 'Closed' },
-            { day: 'Sunday', open: '8:00 AM', close: '11:00 AM' }
-        ],
-        menu: [
-            { id: '1', name: 'Pizza' },
-            { id: '2', name: 'Salad' },
-            { id: '3', name: 'Burger'},
-        ]
-    },
-
-    {
-        id: '4',
-        name: 'Kissam',
-        isOpen: true,
-        hours: [
-            { day: 'Sunday', open: '12:00 PM', close: '4:00 PM' },
-            { day: 'Sunday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Monday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Monday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Monday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Tuesday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Tuesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Tuesday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Wednesday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Wednesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Wednesday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Thursday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Thursday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Thursday', open: '5:00 PM', close: '8:00 PM' },
-            { day: 'Friday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Friday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Saturday', open: 'Closed', close: 'Closed' },
-            { day: 'Sunday', open: '8:00 AM', close: '11:00 AM' }
-        ],
-        menu: [
-            { id: '1', name: 'Pizza' },
-            { id: '2', name: 'Salad' },
-            { id: '3', name: 'Rice'},
-        ]
-    },
-
-    {
-        id: '5',
-        name: 'EBI',
-        isOpen: false,
-        hours: [
-            { day: 'Sunday', open: '12:00 PM', close: '4:00 PM' },
-            { day: 'Sunday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Monday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Monday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Tuesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Tuesday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Wednesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Wednesday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Thursday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Thursday', open: '5:00 PM', close: '9:00 PM' },
-            { day: 'Friday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Saturday', open: 'Closed', close: 'Closed' },
-            { day: 'Sunday', open: '8:00 AM', close: '11:00 AM' }
-        ],
-        menu: [
-            { id: '1', name: 'Pizza' },
-            { id: '2', name: 'Salad' },
-            { id: '3', name: 'Burger'},
-        ]
-    },
-
-    {
-        id: '6',
-        name: 'Commodore Pizza Kitchen',
-        isOpen: true,
-        hours: [
-            { day: 'Monday', open: '11:00 AM', close: '10:00 PM' },
-            { day: 'Tuesday', open: '11:00 AM', close: '10:00 PM' },
-            { day: 'Wednesday', open: '11:00 AM', close: '10:00 PM' },
-            { day: 'Thursday', open: '11:00 AM', close: '10:00 PM' },
-            { day: 'Friday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Saturday', open: '3:00 PM', close: '8:00 PM' },
-            { day: 'Sunday', open: '3:00 PM', close: '10:00 PM' },
-        ],
-        menu: [
-            { id: '1', name: 'Pizza' },
-        ]
-    },
-
-    {
-        id: '7',
-        name: 'Rand Dining Center',
-        isOpen: false,
-        hours: [
-            { day: 'Monday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Monday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Tuesday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Tuesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Wednesday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Wednesday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Thursday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Thursday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Friday', open: '7:00 AM', close: '10:00 AM' },
-            { day: 'Friday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Friday', open: '4:00 PM', close: '8:00 PM' },
-            { day: 'Saturday', open: '8:00 AM', close: '8:00 PM' },
-            { day: 'Sunday', open: 'Closed', close: 'Closed' }
-        ],
-        
-        menu: [
-            { id: '1', name: 'Pizza' },
-        ]
-    },
-
-    {
-        id: '8',
-        name: 'Carmichael',
-        isOpen: false,
-        hours: [
-            { day: 'Monday', open: '7:00 AM', close: '9:00 PM' },
-            { day: 'Tuesday', open: '7:00 AM', close: '9:00 PM' },
-            { day: 'Wednesday', open: '7:00 AM', close: '9:00 PM' },
-            { day: 'Thursday', open: '7:00 AM', close: '9:00 PM' },
-            { day: 'Friday', open: '7:00 AM', close: '11:00 AM' },
-            { day: 'Saturday', open: 'Closed', close: 'Closed' },
-            { day: 'Sunday', open: '10:00 AM', close: '9:00 PM' }
-        ],
-        menu: [
-            { id: '1', name: 'Sandwiches' },
-        ]
-    },
-
-    {
-        id: '9',
-        name: 'The Pub at Overcup Oak',
-        isOpen: false,
-        hours: [
-            { day: 'Monday', open: '11:00 AM', close: '10:00 PM' },
-            { day: 'Tuesday', open: '11:00 AM', close: '10:00 PM' },
-            { day: 'Wednesday', open: '11:00 AM', close: '10:00 PM' },
-            { day: 'Thursday', open: '11:00 AM', close: '10:00 PM' },
-            { day: 'Friday', open: '11:00 AM', close: '3:00 PM' },
-            { day: 'Saturday', open: 'Closed', close: 'Closed' },
-            { day: 'Sunday', open: '3:00 PM', close: '10:00 PM' }
-        ],
-        menu: [
-            { id: '1', name: 'Chicken Tenders' },
-        ]
-    },
-
-    {
-        id: '10',
-        name: 'VandyBlenz',
-        isOpen: false,
-        hours: [
-            { day: 'Monday', open: '8:00 AM', close: '5:00 PM' },
-            { day: 'Tuesday', open: '8:00 AM', close: '5:00 PM' },
-            { day: 'Wednesday', open: '8:00 AM', close: '5:00 PM' },
-            { day: 'Thursday', open: '8:00 AM', close: '5:00 PM' },
-            { day: 'Friday', open: '8:00 AM', close: '5:00 PM' },
-            { day: 'Saturday', open: '9:00 AM', close: '2:00 PM' },
-            { day: 'Sunday', open: 'Closed', close: 'Closed' }
-        ],
-        menu: [
-            { id: '1', name: 'Smoothies' },
-        ]
-    },
-
-    {
-        id: '11',
-        name: 'Local Java Cafe at Alumni',
-        isOpen: false,
-        hours: [
-            { day: 'Monday', open: '7:00 AM', close: '2:00 PM' },
-            { day: 'Tuesday', open: '7:00 AM', close: '2:00 PM' },
-            { day: 'Wednesday', open: '7:00 AM', close: '2:00 PM' },
-            { day: 'Thursday', open: '7:00 AM', close: '2:00 PM' },
-            { day: 'Friday', open: '7:00 AM', close: '2:00 PM' },
-            { day: 'Saturday', open: '8:00 AM', close: '1:00 PM' },
-            { day: 'Sunday', open: 'Closed', close: 'Closed' }
-        ],
-        menu: [
-            { id: '1', name: 'Coffee' },
-        ]
-    },
-];
+import { auth } from '../firebase';
 
 const DiningHalls = ({ navigation }) => {
+    const [diningHalls, setDiningHalls] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchDiningHalls();
+    }, []);
+
+    const fetchDiningHalls = async () => {
+        try {
+            const response = await fetch('http://localhost:3000/dining-halls');
+            const data = await response.json();
+            const hallsWithHours = await Promise.all(data.map(async (hall) => {
+                const hoursResponse = await fetch(`http://localhost:3000/dining-halls/${hall.id}/hours`);
+                const hoursData = await hoursResponse.json();
+                return { ...hall, hours: hoursData };
+            }));
+            setDiningHalls(hallsWithHours);
+            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching dining halls:', error);
+            setLoading(false);
+        }
+    };
+
+    const handleProfilePress = () => {
+        const user = auth.currentUser;
+        if (user) {
+            navigation.navigate('ProfileDetails', {
+                name: user.displayName || 'User',
+                email: user.email
+            });
+        } else {
+            navigation.navigate('ProfileScreen');
+        }
+    };
+
+    const checkIfOpen = (hours) => {
+        if (!hours || hours.length === 0) return false;
+
+        const now = new Date();
+        const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
+        const currentTime = now.toLocaleTimeString('en-US', { hour12: false });
+
+        const todayHours = hours.find(h => h.day_of_week === currentDay);
+        if (todayHours) {
+            return currentTime >= todayHours.opening_time && currentTime < todayHours.closing_time;
+        }
+        return false;
+    };
+
+    const openWaitTimes = () => {
+        Linking.openURL('https://campusdining.vanderbilt.edu/wait-times/');
+    };
+
+    if (loading) {
+        return (
+            <View style={[styles.container, styles.centered]}>
+                <ActivityIndicator size="large" color="#0000ff" />
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Available Dining Halls</Text>
-                <TouchableOpacity
-                    style={styles.profileButton}
-                    onPress={() => navigation.navigate('ProfileScreen')}
-                >
+            {/* Nav Bar */}
+            <View style={styles.navBar}>
+                <TouchableOpacity onPress={openWaitTimes} style={styles.navButton}>
+                    <Text style={styles.linkText}>See Current Wait Times</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleProfilePress} style={styles.navButton}>
                     <Icon name="user" size={24} color="#000" />
+                    <Text style={styles.navText}>Profile</Text>
+                    {auth.currentUser && (
+                        <View style={styles.authIndicator} />
+                    )}
                 </TouchableOpacity>
             </View>
+
+            {/* Dining Halls List */}
             <FlatList
                 data={diningHalls}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item.id.toString()}
                 renderItem={({ item }) => (
                     <View style={styles.item}>
                         <TouchableOpacity
                             style={styles.row}
-                            onPress={() => navigation.navigate('MenuScreen', { hallName: item.name })}
+                            onPress={() => navigation.navigate('MenuScreen', { hallId: item.id, hallName: item.name })}
                         >
                             <Text style={styles.text}>{item.name}</Text>
                             <View style={styles.status}>
                                 <Icon
                                     name="circle"
                                     size={18}
-                                    color={item.isOpen ? "green" : "red"}
+                                    color={checkIfOpen(item.hours) ? "green" : "red"}
                                     style={styles.icon}
                                 />
                                 <Text style={styles.statusText}>
-                                    {item.isOpen ? 'Open' : 'Closed'}
+                                    {checkIfOpen(item.hours) ? 'Open' : 'Closed'}
                                 </Text>
                             </View>
                         </TouchableOpacity>
@@ -300,13 +109,13 @@ const DiningHalls = ({ navigation }) => {
                             <View style={styles.button}>
                                 <Button
                                     title="View Hours"
-                                    onPress={() => navigation.navigate('HoursScreen', { hallName: item.name, hours: item.hours })}
+                                    onPress={() => navigation.navigate('HoursScreen', { hallId: item.id, hallName: item.name })}
                                 />
                             </View>
                             <View style={styles.button}>
                                 <Button
                                     title="View Menu"
-                                    onPress={() => navigation.navigate('MenuScreen', { hallName: item.name, menu: item.menu })}
+                                    onPress={() => navigation.navigate('MenuScreen', { hallId: item.id, hallName: item.name })}
                                 />
                             </View>
                         </View>
@@ -323,18 +132,35 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: '#99773d',
     },
-    header: {
+    navBar: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        paddingBottom: 20,
     },
-    title: {
-        fontSize: 24,
+    navButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    navText: {
+        fontSize: 16,
         fontWeight: 'bold',
+        marginLeft: 10,
     },
-    profileButton: {
-        padding: 10,
+    linkText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#00008B', 
+        textDecorationLine: 'underline', 
+    },
+    authIndicator: {
+        position: 'absolute',
+        top: 15,
+        right: 60,
+        width: 8,
+        height: 8,
+        backgroundColor: '#4CAF50',
+        borderRadius: 4,
     },
     item: {
         padding: 15,
@@ -369,6 +195,10 @@ const styles = StyleSheet.create({
     },
     button: {
         marginRight: 10,
+    },
+    centered: {
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 
