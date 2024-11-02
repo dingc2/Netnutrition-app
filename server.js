@@ -131,7 +131,7 @@ app.get('/dining-halls/:name/menu', async (req, res) => {
                 console.log('No matching dining hall found for:', name);
                 res.json({
                     error: 'Dining hall not found',
-                    availableHalls: [] // Will be populated in production
+                    availableHalls: []
                 });
                 return;
             }
@@ -290,6 +290,101 @@ app.get('/menu-items/:foodId/nutrition', (req, res) => {
     });
 });
 
+// Create meal planner table if it doesn't exist
+db.query(`
+    CREATE TABLE IF NOT EXISTS meal_planner (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(128) NOT NULL,
+        food_id VARCHAR(128) NOT NULL,
+        dining_hall VARCHAR(255) NOT NULL,
+        date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_meal_plan (user_id, food_id)
+    )
+`);
+
+// Add item to meal planner
+app.post('/meal-planner/add', (req, res) => {
+    const { userId, foodId, diningHall } = req.body;
+    
+    if (!userId || !foodId || !diningHall) {
+        res.status(400).json({ error: 'Missing required fields' });
+        return;
+    }
+
+    const query = `
+        INSERT INTO meal_planner (user_id, food_id, dining_hall)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE date_added = CURRENT_TIMESTAMP
+    `;
+    
+    db.query(query, [userId, foodId, diningHall], (err, result) => {
+        if (err) {
+            handleDatabaseError(err, res);
+            return;
+        }
+        res.json({ message: 'Item added to meal planner', id: result.insertId });
+    });
+});
+
+// Remove item from meal planner
+app.delete('/meal-planner/:userId/:foodId', (req, res) => {
+    const { userId, foodId } = req.params;
+    
+    const query = `
+        DELETE FROM meal_planner
+        WHERE user_id = ? AND food_id = ?
+    `;
+    
+    db.query(query, [userId, foodId], (err, result) => {
+        if (err) {
+            handleDatabaseError(err, res);
+            return;
+        }
+        res.json({ message: 'Item removed from meal planner' });
+    });
+});
+
+app.get('/meal-planner/:userId', (req, res) => {
+    const { userId } = req.params;
+    
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const query = `
+        SELECT 
+            mp.id AS meal_plan_id,  /* Using the meal_planner table's id */
+            mp.food_id,
+            mp.dining_hall,
+            mp.date_added,
+            f.food_name,
+            f.serving_size,
+            f.calories,
+            f.protein,
+            f.is_vegetarian,
+            f.is_vegan
+        FROM meal_planner mp
+        JOIN foods f ON mp.food_id = f.food_id
+        WHERE mp.user_id = ?
+        ORDER BY mp.date_added DESC
+    `;
+    
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Database error when fetching meal plan:', err);
+            return handleDatabaseError(err, res);
+        }
+        
+        // Transform results to ensure unique IDs
+        const transformedResults = results.map(item => ({
+            ...item,
+            id: item.meal_plan_id, // Use the meal_planner table's id as the unique identifier
+        }));
+        
+        res.json(transformedResults || []);
+    });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     db.query('SELECT 1', (err) => {
@@ -320,7 +415,7 @@ app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
 
-// Graceful shutdown
+// Shutdown
 process.on('SIGTERM', () => {
     console.log('SIGTERM received. Closing HTTP server and database connection...');
     db.end(() => {

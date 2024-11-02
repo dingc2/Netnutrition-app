@@ -1,11 +1,31 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Button, Alert, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Alert, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 
-const ProfileDetails = ({ route, navigation }) => {
-    const { name, email, favoriteItems } = route.params; // Expecting favoriteItems to be passed from the previous screen
-    const [favorites, setFavorites] = useState(favoriteItems || []);
+const ProfileDetails = ({ navigation }) => {
+
+    const generateUniqueKey = (item) => {
+        // Create a unique key using multiple properties
+        return `${item.food_id}-${item.dining_hall}-${Date.now()}`;
+    };
+
+    const [mealPlanItems, setMealPlanItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
+
+    useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            if (user) {
+                setUser(user);
+                fetchMealPlanItems(user.uid);
+            } else {
+                navigation.replace('Login');
+            }
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     const handleLogout = async () => {
         try {
@@ -23,23 +43,110 @@ const ProfileDetails = ({ route, navigation }) => {
         navigation.navigate('DiningHalls');
     };
 
-    const removeFavorite = (itemToRemove) => {
-        setFavorites((prevFavorites) =>
-            prevFavorites.filter((item) => item.id !== itemToRemove.id)
-        );
-    };
 
-    const renderFavoriteItem = ({ item }) => (
-        <View style={styles.favoriteItem}>
-            <Text style={styles.favoriteText}>{item.name}</Text>
+const fetchMealPlanItems = async (userId) => {
+    try {
+        const response = await fetch(`http://localhost:3000/meal-planner/${userId}`);
+        if (!response.ok) throw new Error('Failed to fetch meal plan');
+        
+        const data = await response.json();
+        
+        // Sanitize and format the data
+        const formattedData = data.map(item => ({
+            meal_plan_id: item.meal_plan_id?.toString() || Math.random().toString(),
+            food_id: item.food_id?.toString() || '',
+            food_name: item.food_name?.toString() || 'Unnamed Item',
+            dining_hall: item.dining_hall?.toString() || '',
+            calories: item.calories ? Number(item.calories) : null,
+            serving_size: item.serving_size?.toString() || '',
+            is_vegetarian: Boolean(item.is_vegetarian),
+            is_vegan: Boolean(item.is_vegan),
+        }));
+
+        setMealPlanItems(formattedData);
+    } catch (error) {
+        console.error('Error fetching meal plan:', error);
+        Alert.alert('Error', 'Failed to load meal plan');
+        setMealPlanItems([]); // Set empty array on error
+    } finally {
+        setLoading(false);
+    }
+};
+
+const removeMealPlanItem = async (item) => {
+    try {
+        const response = await fetch(
+            `http://localhost:3000/meal-planner/${user.uid}/${item.food_id?.toString()}`,
+            { method: 'DELETE' }
+        );
+        
+        if (!response.ok) throw new Error('Failed to remove item');
+        
+        setMealPlanItems(prev => prev.filter(i => i.food_id !== item.food_id));
+    } catch (error) {
+        console.error('Error removing item:', error);
+        Alert.alert('Error', 'Failed to remove item from meal plan');
+    }
+};
+
+const renderMealPlanItem = ({ item }) => {
+    // Format the details safely
+    const details = [
+        item.dining_hall,
+        item.calories ? `${item.calories} cal` : null,
+        item.serving_size
+    ].filter(Boolean).join(' • ');
+
+    return (
+        <View style={styles.mealPlanItem}>
+            <View style={styles.itemInfo}>
+                <Text style={styles.itemName} numberOfLines={2}>
+                    {item.food_name}
+                </Text>
+                {details ? (
+                    <Text style={styles.itemDetails} numberOfLines={1}>
+                        {details}
+                    </Text>
+                ) : null}
+                <View style={styles.tagsContainer}>
+                    {item.is_vegetarian && (
+                        <Text style={styles.dietaryTag}>Vegetarian</Text>
+                    )}
+                    {item.is_vegan && (
+                        <Text style={styles.dietaryTag}>Vegan</Text>
+                    )}
+                </View>
+            </View>
             <TouchableOpacity
                 style={styles.removeButton}
-                onPress={() => removeFavorite(item)}
+                onPress={() => {
+                    Alert.alert(
+                        'Remove Item',
+                        'Are you sure you want to remove this item from your meal plan?',
+                        [
+                            { text: 'Cancel', style: 'cancel' },
+                            { 
+                                text: 'Remove', 
+                                onPress: () => removeMealPlanItem(item), 
+                                style: 'destructive' 
+                            }
+                        ]
+                    );
+                }}
             >
                 <Text style={styles.removeButtonText}>Remove</Text>
             </TouchableOpacity>
         </View>
     );
+};
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#007AFF" />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -61,28 +168,128 @@ const ProfileDetails = ({ route, navigation }) => {
                 <Text style={styles.title}>Profile</Text>
                 <View style={styles.infoContainer}>
                     <View style={styles.row}>
-                        <Text style={styles.label}>Name: </Text>
-                        <Text style={styles.info}>{name}</Text>
-                    </View>
-                    <View style={styles.row}>
                         <Text style={styles.label}>Email: </Text>
-                        <Text style={styles.info}>{email}</Text>
+                        <Text style={styles.info}>{user?.email || 'Not available'}</Text>
                     </View>
                 </View>
 
-                <Text style={styles.favoriteTitle}>Meal Planner</Text>
+                <Text style={styles.sectionTitle}>Meal Planner</Text>
                 <FlatList
-                    data={favorites}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={renderFavoriteItem}
-                    ListEmptyComponent={<Text style={styles.emptyMessage}>No Items in Meal Planner.</Text>}
+                    data={mealPlanItems}
+                    keyExtractor={(item) => `meal-plan-${item.meal_plan_id}`}
+                    renderItem={renderMealPlanItem}
+                    ListEmptyComponent={
+                        <Text style={styles.emptyMessage}>
+                        No items in your meal planner. Add items from the menu!
+                        </Text>
+                 }
                 />
             </View>
         </View>
     );
 };
 
+const newStyles = {
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 20,
+        paddingHorizontal: 15,
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+    },
+    profileInfo: {
+        padding: 15,
+        backgroundColor: 'white',
+        borderRadius: 10,
+        marginBottom: 20,
+    },
+    name: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 5,
+    },
+    email: {
+        fontSize: 16,
+        color: '#666',
+    },
+    sectionTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginVertical: 15,
+        paddingHorizontal: 15,
+    },
+    mealPlanItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        padding: 15,
+        marginHorizontal: 15,
+        marginBottom: 10,
+        borderRadius: 10,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 3,
+    },
+    itemInfo: {
+        flex: 1,
+        marginRight: 10,
+    },
+    itemName: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    itemDetails: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 4,
+    },
+    tagsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 5,
+        marginTop: 4,
+    },
+    dietaryTag: {
+        fontSize: 12,
+        color: '#4CAF50',
+        backgroundColor: '#E8F5E9',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    removeButton: {
+        backgroundColor: '#FF5722',
+        padding: 8,
+        borderRadius: 5,
+        minWidth: 70,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    removeButtonText: {
+        color: 'white',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+};
+
 const styles = StyleSheet.create({
+    ...StyleSheet.create(newStyles),
     container: {
         flex: 1,
         padding: 20,

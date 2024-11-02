@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ActivityIndicator, ScrollView, FlatList } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
+import { auth } from '../firebase';
 
 const MenuScreen = ({ route }) => {
     const { hallName } = route.params;
@@ -15,6 +16,7 @@ const MenuScreen = ({ route }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [categorizedMenuItems, setCategorizedMenuItems] = useState({});
+    const [userId, setUserId] = useState(null);
 
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
@@ -58,6 +60,16 @@ const MenuScreen = ({ route }) => {
             setCategorizedMenuItems({});
         }
     }, [menuData, selectedMeal, selectedDietaryFilter]);
+
+    useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            if (user) {
+                setUserId(user.uid);
+            }
+        });
+    
+        return () => unsubscribe();
+    }, []);
 
     const fetchMenuForDay = async (day) => {
         try {
@@ -110,10 +122,42 @@ const MenuScreen = ({ route }) => {
         }
     };
 
-    const handleAddToFavorites = (item) => {
-        console.log(`${item.name} added to favorites!`);
-        setFavoriteIndicatorVisible(true);
-        setTimeout(() => setFavoriteIndicatorVisible(false), 2000);
+    const handleAddToFavorites = async (item) => {
+        if (!userId) {
+            Alert.alert(
+                'Sign In Required',
+                'Please sign in to use the meal planner feature.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Sign In', onPress: () => navigation.navigate('Login') }
+                ]
+            );
+            return;
+        }
+    
+        try {
+            const response = await fetch('http://localhost:3000/meal-planner/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: userId,
+                    foodId: item.id,
+                    diningHall: hallName
+                }),
+            });
+    
+            if (!response.ok) {
+                throw new Error('Failed to add item to meal planner');
+            }
+    
+            setFavoriteIndicatorVisible(true);
+            setTimeout(() => setFavoriteIndicatorVisible(false), 2000);
+        } catch (error) {
+            console.error('Error adding to meal planner:', error);
+            Alert.alert('Error', 'Failed to add item to meal planner');
+        }
     };
 
     const toggleCategory = (category) => {
