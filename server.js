@@ -36,183 +36,257 @@ const handleDatabaseError = (err, res) => {
     });
 };
 
-// Routes
-
-// Get all dining halls
+// Get all dining halls (unique list from dining_halls_times)
 app.get('/dining-halls', (req, res) => {
-    const query = `SELECT * FROM DiningHalls`;
+    const query = `
+        SELECT DISTINCT dining_hall 
+        FROM menu_items
+        ORDER BY dining_hall
+    `;
     
     db.query(query, (err, results) => {
         if (err) {
             handleDatabaseError(err, res);
             return;
         }
-        res.json(results);
+        res.json(results.map(row => ({ name: row.dining_hall })));
     });
 });
 
-// Get specific dining hall
-app.get('/dining-halls/:id', (req, res) => {
-    const query = `SELECT * FROM DiningHalls WHERE id = ?`;
-    
-    db.query(query, [req.params.id], (err, results) => {
-        if (err) {
-            handleDatabaseError(err, res);
-            return;
-        }
-        if (results.length === 0) {
-            res.status(404).json({ error: 'Dining hall not found' });
-            return;
-        }
-        res.json(results[0]);
-    });
-});
-
-// API to fetch hours grouped by day and meal type
-app.get('/dining-halls/:id/hours', (req, res) => {
-    const hallId = req.params.id;
-    const sqlQuery = `
-        SELECT day_of_week, meal_name, opening_time, closing_time
-        FROM Hours
-        JOIN MealTypes ON Hours.meal_type_id = MealTypes.id
-        WHERE dining_hall_id = ?
-        ORDER BY FIELD(day_of_week, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'), meal_type_id
-    `;
-    db.query(sqlQuery, [hallId], (err, results) => {
-        if (err) {
-            console.error(err);
-            res.status(500).json({ error: 'Database query error' });
-        } else {
-            res.json(results);
-        }
-    });
-});
-
-// Get all meal types
-app.get('/meal-types', (req, res) => {
-    const query = `SELECT * FROM MealTypes`;
-    
-    db.query(query, (err, results) => {
-        if (err) {
-            handleDatabaseError(err, res);
-            return;
-        }
-        res.json(results);
-    });
-});
-
-// Get menu for a specific dining hall, meal type, and day
-app.get('/dining-halls/:id/menu/:mealTypeId/:day', (req, res) => {
-    const { id, mealTypeId, day } = req.params;
+// Get dining hall hours for a specific dining hall
+app.get('/dining-halls/:name/hours', (req, res) => {
     const query = `
         SELECT 
-            mi.id,
-            mi.item_name,
-            mi.dietary_info,
-            wm.day_of_week,
-            wm.week_start_date
-        FROM MenuItems mi
-        JOIN WeeklyMenus wm ON mi.weekly_menu_id = wm.id
-        WHERE wm.dining_hall_id = ? 
-        AND wm.meal_type_id = ?
-        AND wm.day_of_week = ?
-        AND wm.week_start_date = (
-            SELECT MAX(week_start_date)
-            FROM WeeklyMenus
-            WHERE dining_hall_id = ?
-            AND meal_type_id = ?
-            AND day_of_week = ?
-        )
+            day,
+            breakfast_open,
+            breakfast_close,
+            lunch_open,
+            lunch_close,
+            dinner_open,
+            dinner_close
+        FROM dining_halls_times
+        WHERE dining_hall = ?
+        ORDER BY CASE day
+            WHEN 'Monday' THEN 1
+            WHEN 'Tuesday' THEN 2
+            WHEN 'Wednesday' THEN 3
+            WHEN 'Thursday' THEN 4
+            WHEN 'Friday' THEN 5
+            WHEN 'Saturday' THEN 6
+            WHEN 'Sunday' THEN 7
+        END
     `;
     
-    db.query(query, [id, mealTypeId, day, id, mealTypeId, day], (err, results) => {
-        if (err) {
-            handleDatabaseError(err, res);
-            return;
-        }
-        res.json(results);
-    });
-});
-
-// Get nutritional information for a specific menu item
-app.get('/menu-items/:id/nutrition', (req, res) => {
-    const query = `
-        SELECT 
-            ni.*,
-            mi.item_name
-        FROM NutritionalInfo ni
-        JOIN MenuItems mi ON ni.menu_item_id = mi.id
-        WHERE ni.menu_item_id = ?
-    `;
-    
-    db.query(query, [req.params.id], (err, results) => {
-        if (err) {
-            handleDatabaseError(err, res);
-            return;
-        }
-        if (results.length === 0) {
-            res.status(404).json({ error: 'Nutritional information not found' });
-            return;
-        }
-        res.json(results[0]);
-    });
-});
-
-// Get weekly menu for a dining hall
-app.get('/dining-halls/:id/weekly-menu', (req, res) => {
-    const query = `
-        SELECT 
-            wm.id as weekly_menu_id,
-            wm.day_of_week,
-            mt.meal_name,
-            mi.id as item_id,
-            mi.item_name,
-            mi.dietary_info
-        FROM WeeklyMenus wm
-        JOIN MealTypes mt ON wm.meal_type_id = mt.id
-        JOIN MenuItems mi ON mi.weekly_menu_id = wm.id
-        WHERE wm.dining_hall_id = ?
-        AND wm.week_start_date = (
-            SELECT MAX(week_start_date)
-            FROM WeeklyMenus
-            WHERE dining_hall_id = ?
-        )
-        ORDER BY
-            CASE wm.day_of_week
-                WHEN 'Monday' THEN 1
-                WHEN 'Tuesday' THEN 2
-                WHEN 'Wednesday' THEN 3
-                WHEN 'Thursday' THEN 4
-                WHEN 'Friday' THEN 5
-                WHEN 'Saturday' THEN 6
-                WHEN 'Sunday' THEN 7
-            END,
-            mt.id
-    `;
-    
-    db.query(query, [req.params.id, req.params.id], (err, results) => {
+    db.query(query, [req.params.name], (err, results) => {
         if (err) {
             handleDatabaseError(err, res);
             return;
         }
         
-        // Transform the results into a nested structure
-        const weeklyMenu = {};
-        results.forEach(item => {
-            if (!weeklyMenu[item.day_of_week]) {
-                weeklyMenu[item.day_of_week] = {};
+        const formattedResults = results.map(row => ({
+            day: row.day,
+            meals: {
+                breakfast: row.breakfast_open ? {
+                    open: row.breakfast_open,
+                    close: row.breakfast_close
+                } : null,
+                lunch: row.lunch_open ? {
+                    open: row.lunch_open,
+                    close: row.lunch_close
+                } : null,
+                dinner: row.dinner_open ? {
+                    open: row.dinner_open,
+                    close: row.dinner_close
+                } : null
             }
-            if (!weeklyMenu[item.day_of_week][item.meal_name]) {
-                weeklyMenu[item.day_of_week][item.meal_name] = [];
+        }));
+        
+        res.json(formattedResults);
+    });
+});
+
+app.get('/dining-halls/:name/menu', async (req, res) => {
+    try {
+        const { name } = req.params;
+        const { date } = req.query;
+        
+        console.log('Menu request params:', { name, date });
+
+        // First get exact dining hall name
+        const nameQuery = `
+            SELECT DISTINCT dining_hall 
+            FROM menu_items 
+            WHERE dining_hall LIKE ?
+            LIMIT 1
+        `;
+
+        db.query(nameQuery, [`%${name}%`], (nameErr, nameResults) => {
+            if (nameErr) {
+                console.error('Name query error:', nameErr);
+                handleDatabaseError(nameErr, res);
+                return;
             }
-            weeklyMenu[item.day_of_week][item.meal_name].push({
-                id: item.item_id,
-                name: item.item_name,
-                dietary_info: item.dietary_info
+
+            if (nameResults.length === 0) {
+                console.log('No matching dining hall found for:', name);
+                res.json({
+                    error: 'Dining hall not found',
+                    availableHalls: [] // Will be populated in production
+                });
+                return;
+            }
+
+            const exactName = nameResults[0].dining_hall;
+            console.log('Matched dining hall name:', exactName);
+
+            // Get menu items
+            const query = `
+                SELECT 
+                    mi.food_id,
+                    mi.food_name,
+                    mi.meal,
+                    mi.category,
+                    mi.date,
+                    f.*
+                FROM menu_items mi
+                LEFT JOIN foods f ON mi.food_id = f.food_id
+                WHERE mi.dining_hall = ?
+                AND DATE(mi.date) = ?
+                ORDER BY 
+                    CASE mi.meal
+                        WHEN 'Breakfast' THEN 1
+                        WHEN 'Lunch' THEN 2
+                        WHEN 'Dinner' THEN 3
+                        ELSE 4
+                    END,
+                    mi.category
+            `;
+
+            db.query(query, [exactName, date], (err, results) => {
+                if (err) {
+                    console.error('Menu query error:', err);
+                    handleDatabaseError(err, res);
+                    return;
+                }
+
+                console.log(`Found ${results.length} menu items for ${exactName}`);
+
+                const menuByMeal = results.reduce((acc, item) => {
+                    const meal = item.meal || 'Other';
+                    const category = item.category || 'Uncategorized';
+
+                    if (!acc[meal]) {
+                        acc[meal] = {};
+                    }
+                    if (!acc[meal][category]) {
+                        acc[meal][category] = [];
+                    }
+
+                    acc[meal][category].push({
+                        id: item.food_id,
+                        name: item.food_name,
+                        category: item.category,
+                        dietaryInfo: {
+                            vegan: Boolean(item.is_vegan),
+                            vegetarian: Boolean(item.is_vegetarian),
+                            containsGluten: Boolean(item.has_gluten),
+                            containsDairy: Boolean(item.has_dairy),
+                            containsPeanuts: Boolean(item.has_peanut),
+                            containsTreeNuts: Boolean(item.has_tree_nut),
+                            containsShellfish: Boolean(item.has_shellfish)
+                        }
+                    });
+
+                    return acc;
+                }, {});
+
+                res.json(menuByMeal);
             });
         });
+    } catch (error) {
+        console.error('Menu endpoint error:', error);
+        res.status(500).json({ error: 'Failed to fetch menu' });
+    }
+});
+
+// Get nutritional information for a specific food item
+app.get('/menu-items/:foodId/nutrition', (req, res) => {
+    const query = `
+        SELECT *
+        FROM foods
+        WHERE food_id = ?
+    `;
+    
+    db.query(query, [req.params.foodId], (err, results) => {
+        if (err) {
+            handleDatabaseError(err, res);
+            return;
+        }
         
-        res.json(weeklyMenu);
+        if (results.length === 0) {
+            res.status(404).json({ error: 'Food item not found' });
+            return;
+        }
+        
+        const item = results[0];
+        res.json({
+            name: item.food_name,
+            servingSize: item.serving_size,
+            nutrients: {
+                calories: item.calories,
+                caloriesFromFat: item.calories_from_fat,
+                totalFat: item.total_fat,
+                totalFatPDV: item.total_fat_pdv,
+                saturatedFat: item.saturated_fat,
+                saturatedFatPDV: item.saturated_fat_pdv,
+                transFat: item.trans_fat,
+                cholesterol: item.cholesterol,
+                cholesterolPDV: item.cholesterol_pdv,
+                sodium: item.sodium,
+                sodiumPDV: item.sodium_pdv,
+                potassium: item.potassium,
+                potassiumPDV: item.potassium_pdv,
+                totalCarbohydrates: item.total_carbohydrates,
+                totalCarbohydratesPDV: item.total_carbohydrates_pdv,
+                dietaryFiber: item.dietary_fiber,
+                dietaryFiberPDV: item.dietary_fiber_pdv,
+                sugars: item.sugars,
+                protein: item.protein,
+                proteinPDV: item.protein_pdv
+            },
+            vitamins: {
+                vitaminA: item.vitamin_a_pdv,
+                vitaminC: item.vitamin_c_pdv,
+                vitaminD: item.vitamin_d_pdv,
+                calcium: item.calcium_pdv,
+                iron: item.iron_pdv
+            },
+            allergens: {
+                alcohol: item.has_alcohol,
+                coconut: item.has_coconut,
+                dairy: item.has_dairy,
+                egg: item.has_egg,
+                fish: item.has_fish,
+                gluten: item.has_gluten,
+                peanut: item.has_peanut,
+                pork: item.has_pork,
+                sesame: item.has_sesame,
+                shellfish: item.has_shellfish,
+                soy: item.has_soy,
+                treeNut: item.has_tree_nut
+            },
+            certifications: {
+                cageFree: item.is_cage_free_certified,
+                organic: item.is_certified_organic,
+                halal: item.is_halal,
+                humanelyRaised: item.is_humanely_raised,
+                kosher: item.is_kosher,
+                local: item.is_local,
+                vegan: item.is_vegan,
+                vegetarian: item.is_vegetarian
+            },
+            ingredients: item.ingredients
+        });
     });
 });
 
@@ -241,13 +315,12 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
 
-// shutdown server
+// Graceful shutdown
 process.on('SIGTERM', () => {
     console.log('SIGTERM received. Closing HTTP server and database connection...');
     db.end(() => {

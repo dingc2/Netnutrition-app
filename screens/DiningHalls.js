@@ -16,7 +16,7 @@ const DiningHalls = ({ navigation }) => {
             const response = await fetch('http://localhost:3000/dining-halls');
             const data = await response.json();
             const hallsWithHours = await Promise.all(data.map(async (hall) => {
-                const hoursResponse = await fetch(`http://localhost:3000/dining-halls/${hall.id}/hours`);
+                const hoursResponse = await fetch(`http://localhost:3000/dining-halls/${hall.name}/hours`);
                 const hoursData = await hoursResponse.json();
                 return { ...hall, hours: hoursData };
             }));
@@ -45,11 +45,18 @@ const DiningHalls = ({ navigation }) => {
 
         const now = new Date();
         const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
-        const currentTime = now.toLocaleTimeString('en-US', { hour12: false });
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentTime = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
 
-        const todayHours = hours.find(h => h.day_of_week === currentDay);
+        const todayHours = hours.find(h => h.day === currentDay);
         if (todayHours) {
-            return currentTime >= todayHours.opening_time && currentTime < todayHours.closing_time;
+            // Check each meal period
+            const { meals } = todayHours;
+            return Object.values(meals).some(meal => {
+                if (!meal) return false;
+                return currentTime >= meal.open && currentTime < meal.close;
+            });
         }
         return false;
     };
@@ -68,7 +75,6 @@ const DiningHalls = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
-            {/* Nav Bar */}
             <View style={styles.navBar}>
                 <TouchableOpacity onPress={openWaitTimes} style={styles.navButton}>
                     <Text style={styles.linkText}>See Current Wait Times</Text>
@@ -82,16 +88,12 @@ const DiningHalls = ({ navigation }) => {
                 </TouchableOpacity>
             </View>
 
-            {/* Dining Halls List */}
             <FlatList
                 data={diningHalls}
-                keyExtractor={(item) => item.id.toString()}
+                keyExtractor={(item) => item.name}
                 renderItem={({ item }) => (
                     <View style={styles.item}>
-                        <TouchableOpacity
-                            style={styles.row}
-                            onPress={() => navigation.navigate('MenuScreen', { hallId: item.id, hallName: item.name })}
-                        >
+                        <View style={styles.contentContainer}>
                             <Text style={styles.text}>{item.name}</Text>
                             <View style={styles.status}>
                                 <Icon
@@ -104,18 +106,22 @@ const DiningHalls = ({ navigation }) => {
                                     {checkIfOpen(item.hours) ? 'Open' : 'Closed'}
                                 </Text>
                             </View>
-                        </TouchableOpacity>
+                        </View>
                         <View style={styles.buttonContainer}>
                             <View style={styles.button}>
                                 <Button
                                     title="View Hours"
-                                    onPress={() => navigation.navigate('HoursScreen', { hallId: item.id, hallName: item.name })}
+                                    onPress={() => navigation.navigate('HoursScreen', { 
+                                        hallName: item.name 
+                                    })}
                                 />
                             </View>
                             <View style={styles.button}>
                                 <Button
                                     title="View Menu"
-                                    onPress={() => navigation.navigate('MenuScreen', { hallId: item.id, hallName: item.name })}
+                                    onPress={() => navigation.navigate('MenuScreen', { 
+                                        hallName: item.name 
+                                    })}
                                 />
                             </View>
                         </View>
@@ -167,18 +173,21 @@ const styles = StyleSheet.create({
         backgroundColor: '#ddd',
         borderRadius: 5,
         marginBottom: 10,
+        position: 'relative',
+    },
+    contentContainer: {
+        position: 'relative',
+        minHeight: 50,
     },
     text: {
         fontSize: 18,
     },
-    row: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
     status: {
         flexDirection: 'row',
         alignItems: 'center',
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
     },
     icon: {
         marginRight: 5,

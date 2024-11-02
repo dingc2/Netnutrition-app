@@ -2,56 +2,44 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 
 const HoursScreen = ({ route }) => {
-    const { hallId, hallName } = route.params;
+    const { hallName } = route.params;
     const [hours, setHours] = useState([]);
 
     useEffect(() => {
         fetchHours();
     }, []);
 
-    // Helper function to convert 24-hour time to 12-hour format
-    const convertTo12HourFormat = (time) => {
-        let [hour, minute] = time.split(':');
-        hour = parseInt(hour);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        hour = hour % 12 || 12; 
-        return `${hour}:${minute} ${ampm}`;
-    };
-
     const fetchHours = async () => {
         try {
-            const response = await fetch(`http://localhost:3000/dining-halls/${hallId}/hours`);
+            const response = await fetch(`http://localhost:3000/dining-halls/${hallName}/hours`);
             const data = await response.json();
 
-            // Map meal_type_id to meal names
-            const mealTypeMap = {
-                1: 'breakfast',
-                2: 'lunch',
-                3: 'dinner'
-            };
-
-            // Group hours by day of the week
-            const groupedHours = data.reduce((acc, curr) => {
-                if (!acc[curr.day_of_week]) {
-                    acc[curr.day_of_week] = { breakfast: '', lunch: '', dinner: '' };
-                }
-                const timeRange = `${convertTo12HourFormat(curr.opening_time)} - ${convertTo12HourFormat(curr.closing_time)}`;
-                const mealName = mealTypeMap[curr.meal_type_id];
-                if (mealName) {
-                    acc[curr.day_of_week][mealName] = timeRange;
-                }
-                return acc;
-            }, {});
-
-            // Convert object to array for FlatList
-            const formattedHours = Object.entries(groupedHours).map(([day, times]) => ({
-                day,
-                ...times
+            // Format the hours data
+            const formattedHours = data.map(dayData => ({
+                day: dayData.day,
+                breakfast: dayData.meals.breakfast 
+                    ? `${formatTime(dayData.meals.breakfast.open)} - ${formatTime(dayData.meals.breakfast.close)}`
+                    : 'Closed',
+                lunch: dayData.meals.lunch
+                    ? `${formatTime(dayData.meals.lunch.open)} - ${formatTime(dayData.meals.lunch.close)}`
+                    : 'Closed',
+                dinner: dayData.meals.dinner
+                    ? `${formatTime(dayData.meals.dinner.open)} - ${formatTime(dayData.meals.dinner.close)}`
+                    : 'Closed'
             }));
+
             setHours(formattedHours);
         } catch (error) {
             console.error('Error fetching hours:', error);
         }
+    };
+
+    const formatTime = (time) => {
+        const [hours, minutes] = time.split(':');
+        const hour = parseInt(hours, 10);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const adjustedHour = hour % 12 || 12;
+        return `${adjustedHour}:${minutes} ${ampm}`;
     };
 
     const renderDayItem = ({ item }) => (
@@ -68,7 +56,7 @@ const HoursScreen = ({ route }) => {
             <Text style={styles.title}>{hallName} - Hours</Text>
             <FlatList
                 data={hours}
-                keyExtractor={(item, index) => index.toString()}
+                keyExtractor={(item) => item.day}
                 renderItem={renderDayItem}
             />
         </View>
