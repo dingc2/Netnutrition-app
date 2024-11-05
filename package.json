@@ -41,6 +41,7 @@
     "typescript": "~5.3.3"
   },
   "devDependencies": {
+    "concurrently": "^9.0.1",
     "react-native-dotenv": "^3.4.11"
   }
 }

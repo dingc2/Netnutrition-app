@@ -2,21 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button, ActivityIndicator, Linking } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { auth } from '../firebase';
+import { DB_DOMAIN } from '@env';
 
+//TODO make http link not hard coded
 const DiningHalls = ({ navigation }) => {
     const [diningHalls, setDiningHalls] = useState([]);
     const [loading, setLoading] = useState(true);
-
+    const domain = DB_DOMAIN;
+    console.log("domain is: " + domain);
+    const url = "http://" + domain + ":3000/dining-halls/dining-halls";
     useEffect(() => {
         fetchDiningHalls();
     }, []);
 
     const fetchDiningHalls = async () => {
         try {
-            const response = await fetch('http://localhost:3000/dining-halls');
+            const response = await fetch(url);
             const data = await response.json();
             const hallsWithHours = await Promise.all(data.map(async (hall) => {
-                const hoursResponse = await fetch(`http://localhost:3000/dining-halls/${hall.id}/hours`);
+                const hoursResponse = await fetch(`${url}/${hall.id}/hours`);
                 const hoursData = await hoursResponse.json();
                 return { ...hall, hours: hoursData };
             }));

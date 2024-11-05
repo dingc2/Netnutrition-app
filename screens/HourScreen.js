@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { DB_DOMAIN } from '@env';
 
 const HoursScreen = ({ route }) => {
     const { hallId, hallName } = route.params;
     const [hours, setHours] = useState([]);
+    const domain = DB_Domain;
+    const url = "http://" + domain + ":3000/dining-halls/${hallId}/hours";
 
     useEffect(() => {
         fetchHours();
@@ -20,7 +23,7 @@ const HoursScreen = ({ route }) => {
 
     const fetchHours = async () => {
         try {
-            const response = await fetch(`http://localhost:3000/dining-halls/${hallId}/hours`);
+            const response = await fetch(url);
             const data = await response.json();
 
             // Map meal_type_id to meal names

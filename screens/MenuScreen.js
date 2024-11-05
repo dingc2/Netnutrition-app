@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
+import { DB_DOMAIN } from '@env';
 
 const MenuScreen = ({ route }) => {
     const { hallId, hallName } = route.params;
@@ -50,11 +51,14 @@ const MenuScreen = ({ route }) => {
         setFilteredMenuItems(filtered);
     };
 
+    const domain = DB_Domain;
+    const url = "http://" + domain + ":3000";
+
     const fetchMealTypes = async () => {
         try {
             setIsLoading(true);
             setError(null);
-            const response = await fetch('http://localhost:3000/meal-types');
+            const response = await fetch(`${url}/meal-types`);
             if (!response.ok) throw new Error('Failed to fetch meal types');
             const data = await response.json();
             setMealTypes(data);
@@ -71,7 +75,7 @@ const MenuScreen = ({ route }) => {
             setIsLoading(true);
             setError(null);
             const response = await fetch(
-                `http://localhost:3000/dining-halls/${hallId}/menu/${mealTypeId}/${day}`
+                url + "/dining-halls/${hallId}/menu/${mealTypeId}/${day}"
             );
             if (!response.ok) throw new Error('Failed to fetch menu items');
             const data = await response.json();
@@ -89,7 +93,7 @@ const MenuScreen = ({ route }) => {
         try {
             setIsLoading(true);
             const response = await fetch(
-                `http://localhost:3000/menu-items/${itemId}/nutrition`
+                url + "/menu-items/${itemId}/nutrition"
             );
             if (!response.ok) throw new Error('Failed to fetch nutritional info');
             const data = await response.json();
