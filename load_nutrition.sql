@@ -57,7 +57,7 @@ CREATE TABLE foods (
 );
 
 -- Load data from CSV file
-LOAD DATA INFILE '/Users/sung-linhsieh/Desktop/Netnutrition-app/nutrition_info.csv'
+LOAD DATA INFILE 'C:/Users/rwrfi/Vanderbilt stuff/CSSWE/Netnutrition-app/nutrition_info.csv'
 IGNORE
 INTO TABLE foods
 FIELDS TERMINATED BY ','

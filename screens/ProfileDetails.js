@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
+import { DB_DOMAIN } from '@env';
 
 const ProfileDetails = ({ navigation }) => {
-
+    const domain = DB_DOMAIN;
     const generateUniqueKey = (item) => {
         // Create a unique key using multiple properties
         return `${item.food_id}-${item.dining_hall}-${Date.now()}`;
@@ -46,7 +47,7 @@ const ProfileDetails = ({ navigation }) => {
 
 const fetchMealPlanItems = async (userId) => {
     try {
-        const response = await fetch(`http://localhost:3000/meal-planner/${userId}`);
+        const response = await fetch(`http://${domain}:3000/meal-planner/${userId}`);
         if (!response.ok) throw new Error('Failed to fetch meal plan');
         
         const data = await response.json();
@@ -75,8 +76,9 @@ const fetchMealPlanItems = async (userId) => {
 
 const removeMealPlanItem = async (item) => {
     try {
+        const domain = DB_DOMAIN;
         const response = await fetch(
-            `http://localhost:3000/meal-planner/${user.uid}/${item.food_id?.toString()}`,
+            `http://${domain}:3000/meal-planner/${user.uid}/${item.food_id?.toString()}`,
             { method: 'DELETE' }
         );
         

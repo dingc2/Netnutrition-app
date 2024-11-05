@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ActivityIndicator, ScrollView, FlatList } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import { auth } from '../firebase';
+import { DB_DOMAIN } from '@env';
 
 const MenuScreen = ({ route }) => {
+    const domain = DB_DOMAIN;
     const { hallName } = route.params;
     const [menuData, setMenuData] = useState({});
     const [selectedMeal, setSelectedMeal] = useState(null);
@@ -77,7 +79,7 @@ const MenuScreen = ({ route }) => {
             setError(null);
             const date = formatDate(day);
             const response = await fetch(
-                `http://localhost:3000/dining-halls/${encodeURIComponent(hallName)}/menu?date=${date}`
+                `http://${domain}:3000/dining-halls/${encodeURIComponent(hallName)}/menu?date=${date}`
             );
             
             if (!response.ok) {
@@ -109,7 +111,7 @@ const MenuScreen = ({ route }) => {
     const fetchNutritionalInfo = async (itemId) => {
         try {
             setIsLoading(true);
-            const response = await fetch(`http://localhost:3000/menu-items/${itemId}/nutrition`);
+            const response = await fetch(`http://${domain}:3000/menu-items/${itemId}/nutrition`);
             if (!response.ok) throw new Error('Failed to fetch nutritional info');
             const data = await response.json();
             setSelectedItemNutrition(data);
@@ -136,7 +138,7 @@ const MenuScreen = ({ route }) => {
         }
     
         try {
-            const response = await fetch('http://localhost:3000/meal-planner/add', {
+            const response = await fetch(`http://${domain}:3000/meal-planner/add`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
