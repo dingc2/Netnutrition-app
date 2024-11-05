@@ -40,32 +40,37 @@ export default function App() {
                 <Stack.Screen 
                     name="MenuScreen" 
                     component={MenuScreen} 
-                    options={{ title: 'Menu' }} 
+                    options={({ route }) => ({ 
+                        title: `${route.params?.hallName || 'Menu'}`,
+                        headerBackTitle: 'Back'
+                    })} 
                 />
                 <Stack.Screen 
                     name="HoursScreen" 
                     component={HoursScreen} 
-                    options={{ title: 'Hours' }} 
+                    options={({ route }) => ({ 
+                        title: `${route.params?.hallName || 'Hours'}`,
+                        headerBackTitle: 'Back'
+                    })} 
                 />
                 <Stack.Screen 
                     name="ProfileScreen" 
                     component={ProfileScreen} 
                     options={{ title: 'Profile' }} 
                 />
-                {!user ? (
-                    <>
-                        <Stack.Screen 
-                            name="Registration" 
-                            component={Registration} 
-                            options={{ title: 'Registration' }} 
-                        />
-                        <Stack.Screen 
-                            name="Login" 
-                            component={Login} 
-                            options={{ title: 'Login' }} 
-                        />
-                    </>
-                ) : (
+                {/* Always show Registration and Login screens */}
+                <Stack.Screen 
+                    name="Registration" 
+                    component={Registration} 
+                    options={{ title: 'Registration' }} 
+                />
+                <Stack.Screen 
+                    name="Login" 
+                    component={Login} 
+                    options={{ title: 'Login' }} 
+                />
+                {/* ProfileDetails will only show if user is authenticated */}
+                {user && (
                     <Stack.Screen 
                         name="ProfileDetails" 
                         component={ProfileDetails} 
