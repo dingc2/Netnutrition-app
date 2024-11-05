@@ -14,7 +14,7 @@ CREATE TABLE dining_hours (
 
 
 -- Load the CSV data
-LOAD DATA INFILE '/Users/sung-linhsieh/Desktop/Netnutrition-app/dininghall_hours.csv'
+LOAD DATA INFILE 'C:/Users/rwrfi/Vanderbilt stuff/CSSWE/Netnutrition-app/dininghall_hours.csv'
 INTO TABLE dining_hours
 FIELDS TERMINATED BY ','
 LINES TERMINATED BY '\n'
@@ -35,6 +35,9 @@ CREATE TABLE dining_halls_times (
     dinner_close TIME
 );
 
+-- IF INSERT DOESNT WORK RUN THIS:
+-- SET sql_mode = (SELECT REPLACE(@@sql_mode, 'NO_ZERO_IN_DATE', ''));
+-- SET sql_mode = (SELECT REPLACE(@@sql_mode, 'NO_ZERO_DATE', ''));
 INSERT INTO dining_halls_times (
     dining_hall,
     day,
