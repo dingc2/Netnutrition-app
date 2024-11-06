@@ -352,6 +352,7 @@ def scrape_nutritional_info(driver, hall_name, meal_time, date_value, csv_filena
     except Exception as e:
         print(f"Error while scraping meal items: {e}")
 
+
 def get_nutritional_info(driver):
     """
     Extract meal name and nutritional info from the pop-up.
