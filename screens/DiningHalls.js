@@ -19,7 +19,6 @@ const DiningHalls = ({ navigation }) => {
         try {
             const response = await fetch(`http://${domain}:3000/dining-halls`);
             const data = await response.json();
-            console.log(response);
             const hallsWithHours = await Promise.all(data.map(async (hall) => {
                 const hoursResponse = await fetch(`http://${domain}:3000/dining-halls/${hall.name}/hours`);
                 const hoursData = await hoursResponse.json();
