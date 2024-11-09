@@ -5,7 +5,7 @@ import { DB_DOMAIN } from '@env';
 const HoursScreen = ({ route }) => {
     const { hallName } = route.params;
     const [hours, setHours] = useState([]);
-    const domain = DB_Domain;
+    const domain = DB_DOMAIN;
     // const url = "http://" + domain + ":3000/dining-halls/${hallId}/hours";
 
     useEffect(() => {
@@ -14,7 +14,7 @@ const HoursScreen = ({ route }) => {
 
     const fetchHours = async () => {
         try {
-            const response = await fetch(`http://${domain}:3000/dining-halls/${hallId}/hours`);
+            const response = await fetch(`http://${domain}:3000/dining-halls/${hallName}/hours`);
             const data = await response.json();
 
             // Format the hours data
