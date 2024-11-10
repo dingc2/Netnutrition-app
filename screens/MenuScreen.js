@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, ActivityIndicator, ScrollView, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, ActivityIndicator, ScrollView, FlatList, TextInput, Alert } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import { auth } from '../firebase';
 import { DB_DOMAIN } from '@env';
@@ -19,6 +19,12 @@ const MenuScreen = ({ route }) => {
     const [error, setError] = useState(null);
     const [categorizedMenuItems, setCategorizedMenuItems] = useState({});
     const [userId, setUserId] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filteredMenuItems, setFilteredMenuItems] = useState({});
+    const [isServingSizeModalVisible, setIsServingSizeModalVisible] = useState(false);
+    const [selectedServings, setSelectedServings] = useState('1');
+    const [itemToAdd, setItemToAdd] = useState(null);
+
 
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
@@ -72,6 +78,40 @@ const MenuScreen = ({ route }) => {
     
         return () => unsubscribe();
     }, []);
+
+    useEffect(() => {
+        if (menuData[selectedMeal]) {
+            const filtered = {};
+            Object.entries(menuData[selectedMeal]).forEach(([category, items]) => {
+                // First apply dietary filter
+                const dietaryFiltered = items.filter(item => {
+                    if (selectedDietaryFilter === 'all') return true;
+                    switch (selectedDietaryFilter) {
+                        case 'vegan':
+                            return item.dietaryInfo.vegan;
+                        case 'vegetarian':
+                            return item.dietaryInfo.vegetarian;
+                        case 'gluten-free':
+                            return !item.dietaryInfo.containsGluten;
+                        default:
+                            return true;
+                    }
+                });
+
+                // Then apply search filter
+                const searchFiltered = dietaryFiltered.filter(item =>
+                    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+                );
+
+                if (searchFiltered.length > 0) {
+                    filtered[category] = searchFiltered;
+                }
+            });
+            setCategorizedMenuItems(filtered);
+        } else {
+            setCategorizedMenuItems({});
+        }
+    }, [menuData, selectedMeal, selectedDietaryFilter, searchQuery]);
 
     const fetchMenuForDay = async (day) => {
         try {
@@ -136,8 +176,33 @@ const MenuScreen = ({ route }) => {
             );
             return;
         }
+
+        setItemToAdd(item);
+        setSelectedServings('1');
+        setIsServingSizeModalVisible(true);
+    };
+
+    const handleConfirmServings = async () => {
+        const servings = parseFloat(selectedServings);
+        if (isNaN(servings) || servings <= 0) {
+            Alert.alert('Invalid Input', 'Please enter a valid number of servings.');
+            return;
+        }
     
         try {
+            // First fetch the base nutritional info
+            const nutritionInfo = await fetchNutritionalInfoForPlanner(itemToAdd.id);
+            
+            // Scale all nutritional values based on servings
+            const scaledNutrition = {
+                calories: Math.round(nutritionInfo.nutrients.calories * servings),
+                protein: Math.round(nutritionInfo.nutrients.protein * servings),
+                totalFat: Math.round(nutritionInfo.nutrients.fat * servings),
+                totalCarbohydrates: Math.round(nutritionInfo.nutrients.carbohydrates * servings),
+                sodium: Math.round(nutritionInfo.nutrients.sodium * servings),
+                dietaryFiber: Math.round(nutritionInfo.nutrients.dietaryFiber * servings)
+            };
+    
             const response = await fetch(`http://${domain}:3000/meal-planner/add`, {
                 method: 'POST',
                 headers: {
@@ -145,8 +210,20 @@ const MenuScreen = ({ route }) => {
                 },
                 body: JSON.stringify({
                     userId: userId,
-                    foodId: item.id,
-                    diningHall: hallName
+                    foodId: itemToAdd.id,
+                    diningHall: hallName,
+                    servings: servings,
+                    foodName: itemToAdd.name,
+                    servingSize: nutritionInfo.servingSize,
+                    isVegetarian: itemToAdd.dietaryInfo.vegetarian,
+                    isVegan: itemToAdd.dietaryInfo.vegan,
+                    // Send the scaled nutrition values
+                    calories: scaledNutrition.calories,
+                    protein: scaledNutrition.protein,
+                    fat: scaledNutrition.totalFat,
+                    carbohydrates: scaledNutrition.totalCarbohydrates,
+                    sodium: scaledNutrition.sodium,
+                    dietaryFiber: scaledNutrition.dietaryFiber
                 }),
             });
     
@@ -154,12 +231,39 @@ const MenuScreen = ({ route }) => {
                 throw new Error('Failed to add item to meal planner');
             }
     
+            setIsServingSizeModalVisible(false);
             setFavoriteIndicatorVisible(true);
             setTimeout(() => setFavoriteIndicatorVisible(false), 2000);
         } catch (error) {
             console.error('Error adding to meal planner:', error);
             Alert.alert('Error', 'Failed to add item to meal planner');
         }
+    };
+    
+    // Helper function to fetch nutritional info
+    const fetchNutritionalInfoForPlanner = async (itemId) => {
+        try {
+            const response = await fetch(`http://${domain}:3000/menu-items/${itemId}/nutrition`);
+            if (!response.ok) throw new Error('Failed to fetch nutritional info');
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            throw new Error('Failed to fetch nutritional information');
+        }
+    };
+
+    const scaleNutrition = (nutrition, servings) => {
+        return {
+            ...nutrition,
+            nutrients: {
+                calories: Math.round(nutrition.nutrients.calories * servings),
+                totalFat: Math.round(nutrition.nutrients.totalFat * servings),
+                totalCarbohydrates: Math.round(nutrition.nutrients.totalCarbohydrates * servings),
+                protein: Math.round(nutrition.nutrients.protein * servings),
+                sodium: Math.round(nutrition.nutrients.sodium * servings),
+                dietaryFiber: Math.round(nutrition.nutrients.dietaryFiber * servings)
+            }
+        };
     };
 
     const toggleCategory = (category) => {
@@ -197,6 +301,48 @@ const MenuScreen = ({ route }) => {
                 ))}
             </ScrollView>
         </View>
+    );
+
+    const renderServingSizeModal = () => (
+        <Modal
+            visible={isServingSizeModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setIsServingSizeModalVisible(false)}
+        >
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Number of Servings</Text>
+                    <Text style={styles.itemName}>{itemToAdd?.name}</Text>
+                    
+                    <View style={styles.servingInputContainer}>
+                        <TextInput
+                            style={styles.servingInput}
+                            value={selectedServings}
+                            onChangeText={setSelectedServings}
+                            keyboardType="decimal-pad"
+                            placeholder="1"
+                        />
+                        <Text style={styles.servingText}>servings</Text>
+                    </View>
+
+                    <View style={styles.modalButtons}>
+                        <TouchableOpacity
+                            style={[styles.modalButton, styles.cancelButton]}
+                            onPress={() => setIsServingSizeModalVisible(false)}
+                        >
+                            <Text style={styles.modalButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.modalButton, styles.confirmButton]}
+                            onPress={handleConfirmServings}
+                        >
+                            <Text style={styles.modalButtonText}>Add to Planner</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
     );
 
     const renderDietaryFilters = () => (
@@ -353,69 +499,194 @@ const MenuScreen = ({ route }) => {
         );
     }
 
-    return (
-        <View style={styles.container}>
-            <Text style={styles.title}>{hallName} Menu</Text>
-            
-            {renderDaySelector()}
-            
-            <View style={styles.mealTypeContainer}>
-                <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.mealTypeScrollContent}
-                >
-                    {Object.keys(menuData).map((meal) => (
-                        <TouchableOpacity
-                            key={meal}
-                            style={[
-                                styles.mealTypeButton,
-                                selectedMeal === meal && styles.selectedMealType
-                            ]}
-                            onPress={() => setSelectedMeal(meal)}
-                        >
-                            <Text style={[
-                                styles.mealTypeText,
-                                selectedMeal === meal && styles.selectedMealTypeText
-                            ]}>
-                                {meal}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-            
-            {renderDietaryFilters()}
-
-            {isLoading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#007AFF" />
-                </View>
-            ) : (
-                <FlatList
-                    data={Object.keys(categorizedMenuItems)}
-                    keyExtractor={(item) => item}
-                    renderItem={renderCategory}
-                    ListEmptyComponent={
-                        <Text style={styles.emptyMessage}>
-                            No items available for the selected filters
-                        </Text>
-                    }
+    const renderSearchBar = () => (
+        <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+                <AntDesign name="search1" size={20} color="#666" style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search menu items..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    placeholderTextColor="#999"
                 />
-            )}
-
-            {renderNutritionModal()}
-            
-            {favoriteIndicatorVisible && (
-                <View style={styles.favoriteIndicator}>
-                    <Text style={styles.favoriteIndicatorText}>
-                        Added to Meal Planner!
-                    </Text>
-                </View>
-            )}
+                {searchQuery !== '' && (
+                    <TouchableOpacity 
+                        onPress={() => setSearchQuery('')}
+                        style={styles.clearButton}
+                    >
+                        <AntDesign name="close" size={20} color="#666" />
+                    </TouchableOpacity>
+                )}
+            </View>
         </View>
     );
-};
+
+    // MenuScreen.js return statement
+return (
+    <View style={styles.container}>
+        <Text style={styles.title}>{hallName} Menu</Text>
+        
+        {renderSearchBar()}
+        {renderDaySelector()}
+        
+        <View style={styles.mealTypeContainer}>
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.mealTypeScrollContent}
+            >
+                {Object.keys(menuData).map((meal) => (
+                    <TouchableOpacity
+                        key={meal}
+                        style={[
+                            styles.mealTypeButton,
+                            selectedMeal === meal && styles.selectedMealType
+                        ]}
+                        onPress={() => setSelectedMeal(meal)}
+                    >
+                        <Text style={[
+                            styles.mealTypeText,
+                            selectedMeal === meal && styles.selectedMealTypeText
+                        ]}>
+                            {meal}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+        </View>
+        
+        {renderDietaryFilters()}
+
+        {isLoading ? (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#007AFF" />
+            </View>
+        ) : (
+            <FlatList
+                data={Object.keys(categorizedMenuItems)}
+                keyExtractor={(item) => item}
+                renderItem={renderCategory}
+                ListEmptyComponent={
+                    <Text style={styles.emptyMessage}>
+                        {searchQuery 
+                            ? `No items found matching "${searchQuery}"`
+                            : 'No items available for the selected filters'}
+                    </Text>
+                }
+            />
+        )}
+
+        {/* Nutrition Information Modal */}
+        <Modal
+            visible={isNutritionModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setIsNutritionModalVisible(false)}
+        >
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Nutritional Information</Text>
+                    {selectedItemNutrition && (
+                        <>
+                            <Text style={styles.nutritionItem}>
+                                Item: {selectedItemNutrition.name}
+                            </Text>
+                            <Text style={styles.nutritionItem}>
+                                Serving Size: {selectedItemNutrition.servingSize}
+                            </Text>
+                            <Text style={styles.nutritionItem}>
+                                Calories: {selectedItemNutrition.nutrients.calories}
+                            </Text>
+                            <Text style={styles.nutritionItem}>
+                                Total Fat: {selectedItemNutrition.nutrients.totalFat}
+                            </Text>
+                            <Text style={styles.nutritionItem}>
+                                Total Carbohydrates: {selectedItemNutrition.nutrients.totalCarbohydrates}
+                            </Text>
+                            <Text style={styles.nutritionItem}>
+                                Protein: {selectedItemNutrition.nutrients.protein}
+                            </Text>
+                            <Text style={styles.nutritionItem}>
+                                Sodium: {selectedItemNutrition.nutrients.sodium}
+                            </Text>
+                            <Text style={styles.nutritionItem}>
+                                Dietary Fiber: {selectedItemNutrition.nutrients.dietaryFiber}
+                            </Text>
+                            <Text style={styles.nutritionItem}>Allergens:</Text>
+                            {Object.entries(selectedItemNutrition.allergens)
+                                .filter(([_, value]) => value)
+                                .map(([allergen]) => (
+                                    <Text key={allergen} style={styles.allergenItem}>
+                                        • {allergen.charAt(0).toUpperCase() + allergen.slice(1)}
+                                    </Text>
+                                ))
+                            }
+                        </>
+                    )}
+                    <TouchableOpacity
+                        style={styles.closeButton}
+                        onPress={() => setIsNutritionModalVisible(false)}
+                    >
+                        <Text style={styles.closeButtonText}>Close</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </Modal>
+
+        {/* Serving Size Modal */}
+        <Modal
+            visible={isServingSizeModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setIsServingSizeModalVisible(false)}
+        >
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Number of Servings</Text>
+                    <Text style={styles.itemName}>{itemToAdd?.name}</Text>
+                    
+                    <View style={styles.servingInputContainer}>
+                        <TextInput
+                            style={styles.servingInput}
+                            value={selectedServings}
+                            onChangeText={setSelectedServings}
+                            keyboardType="decimal-pad"
+                            placeholder="1"
+                            autoFocus={true}
+                        />
+                        <Text style={styles.servingText}>servings</Text>
+                    </View>
+
+                    <View style={styles.modalButtons}>
+                        <TouchableOpacity
+                            style={[styles.modalButton, styles.cancelButton]}
+                            onPress={() => setIsServingSizeModalVisible(false)}
+                        >
+                            <Text style={styles.modalButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.modalButton, styles.confirmButton]}
+                            onPress={handleConfirmServings}
+                        >
+                            <Text style={styles.modalButtonText}>Add to Planner</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+        
+        {/* Success Indicator */}
+        {favoriteIndicatorVisible && (
+            <View style={styles.favoriteIndicator}>
+                <Text style={styles.favoriteIndicatorText}>
+                    Added to Meal Planner!
+                </Text>
+            </View>
+        )}
+    </View>
+);
+  };
 
 const styles = StyleSheet.create({
     container: {
@@ -611,6 +882,40 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
 
+    // Search bar styles
+    searchContainer: {
+        paddingHorizontal: 15,
+        paddingBottom: 15,
+    },
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        height: 40,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+        marginLeft: 10,
+        color: '#333',
+    },
+    searchIcon: {
+        marginRight: 5,
+    },
+    clearButton: {
+        padding: 5,
+    },
+
     // Modal styles
     modalContainer: {
         flex: 1,
@@ -707,6 +1012,49 @@ const styles = StyleSheet.create({
         zIndex: 1000,
     },
     favoriteIndicatorText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    servingInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: 20,
+    },
+    servingInput: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        padding: 10,
+        width: 80,
+        marginRight: 10,
+        fontSize: 18,
+        textAlign: 'center',
+    },
+    servingText: {
+        fontSize: 18,
+        color: '#333',
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 20,
+    },
+    modalButton: {
+        flex: 1,
+        padding: 12,
+        borderRadius: 5,
+        marginHorizontal: 5,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#FF5722',
+    },
+    confirmButton: {
+        backgroundColor: '#4CAF50',
+    },
+    modalButtonText: {
         color: 'white',
         fontSize: 16,
         fontWeight: '600',
