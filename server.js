@@ -36,6 +36,39 @@ const handleDatabaseError = (err, res) => {
     });
 };
 
+db.query('DROP TABLE IF EXISTS meal_planner', (err) => {
+    if (err) {
+        console.error('Error dropping table:', err);
+        return;
+    }
+    console.log('Dropped meal_planner table');
+    
+    // Recreate the table
+    db.query(`
+        CREATE TABLE meal_planner (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id VARCHAR(128) NOT NULL,
+            food_id VARCHAR(128) NOT NULL,
+            dining_hall VARCHAR(255) NOT NULL,
+            servings FLOAT NOT NULL DEFAULT 1,
+            calories FLOAT,
+            protein FLOAT,
+            fat FLOAT,
+            carbohydrates FLOAT,
+            sodium FLOAT,
+            dietary_fiber FLOAT,
+            date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_meal_plan (user_id, food_id)
+        )
+    `, (err) => {
+        if (err) {
+            console.error('Error creating table:', err);
+            return;
+        }
+        console.log('Created new meal_planner table');
+    });
+});
+
 // Get all dining halls (unique list from dining_halls_times)
 app.get('/dining-halls', (req, res) => {
     const query = `
@@ -290,21 +323,21 @@ app.get('/menu-items/:foodId/nutrition', (req, res) => {
     });
 });
 
-// Create meal planner table if it doesn't exist
-db.query(`
-    CREATE TABLE IF NOT EXISTS meal_planner (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id VARCHAR(128) NOT NULL,
-        food_id VARCHAR(128) NOT NULL,
-        dining_hall VARCHAR(255) NOT NULL,
-        date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY unique_meal_plan (user_id, food_id)
-    )
-`);
-
 // Add item to meal planner
+// In server.js, update the add endpoint
 app.post('/meal-planner/add', (req, res) => {
-    const { userId, foodId, diningHall } = req.body;
+    const { 
+        userId, 
+        foodId, 
+        diningHall, 
+        servings,
+        calories,
+        protein,
+        fat,
+        carbohydrates,
+        sodium,
+        dietaryFiber 
+    } = req.body;
     
     if (!userId || !foodId || !diningHall) {
         res.status(400).json({ error: 'Missing required fields' });
@@ -312,12 +345,42 @@ app.post('/meal-planner/add', (req, res) => {
     }
 
     const query = `
-        INSERT INTO meal_planner (user_id, food_id, dining_hall)
-        VALUES (?, ?, ?)
-        ON DUPLICATE KEY UPDATE date_added = CURRENT_TIMESTAMP
+        INSERT INTO meal_planner (
+            user_id, 
+            food_id, 
+            dining_hall, 
+            servings,
+            calories,
+            protein,
+            fat,
+            carbohydrates,
+            sodium,
+            dietary_fiber
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE 
+            servings = VALUES(servings),
+            calories = VALUES(calories),
+            protein = VALUES(protein),
+            fat = VALUES(fat),
+            carbohydrates = VALUES(carbohydrates),
+            sodium = VALUES(sodium),
+            dietary_fiber = VALUES(dietary_fiber),
+            date_added = CURRENT_TIMESTAMP
     `;
     
-    db.query(query, [userId, foodId, diningHall], (err, result) => {
+    db.query(query, [
+        userId, 
+        foodId, 
+        diningHall, 
+        servings,
+        calories,
+        protein,
+        fat,
+        carbohydrates,
+        sodium,
+        dietaryFiber
+    ], (err, result) => {
         if (err) {
             handleDatabaseError(err, res);
             return;
@@ -352,22 +415,30 @@ app.get('/meal-planner/:userId', (req, res) => {
     }
 
     const query = `
-        SELECT 
-            mp.id AS meal_plan_id,  /* Using the meal_planner table's id */
-            mp.food_id,
-            mp.dining_hall,
-            mp.date_added,
-            f.food_name,
-            f.serving_size,
-            f.calories,
-            f.protein,
-            f.is_vegetarian,
-            f.is_vegan
-        FROM meal_planner mp
-        JOIN foods f ON mp.food_id = f.food_id
-        WHERE mp.user_id = ?
-        ORDER BY mp.date_added DESC
-    `;
+    SELECT 
+        mp.id AS meal_plan_id,
+        mp.food_id,
+        mp.dining_hall,
+        f.food_name,
+        f.serving_size,
+        f.calories,
+        f.protein,
+        f.total_fat,
+        f.total_carbohydrates,
+        f.dietary_fiber,
+        f.sodium,
+        f.is_vegetarian,
+        f.is_vegan,
+        mp.servings,  -- Make sure we get the servings
+        mp.calories as scaled_calories,
+        mp.protein as scaled_protein,
+        mp.fat as scaled_fat,
+        mp.carbohydrates as scaled_carbohydrates
+    FROM meal_planner mp
+    JOIN foods f ON mp.food_id = f.food_id
+    WHERE mp.user_id = ?
+    ORDER BY mp.date_added DESC
+`;
     
     db.query(query, [userId], (err, results) => {
         if (err) {

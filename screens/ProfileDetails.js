@@ -14,6 +14,12 @@ const ProfileDetails = ({ navigation }) => {
     const [mealPlanItems, setMealPlanItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
+    const [totalNutrition, setTotalNutrition] = useState({
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0
+    });
 
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -27,6 +33,26 @@ const ProfileDetails = ({ navigation }) => {
 
         return () => unsubscribe();
     }, []);
+
+    useEffect(() => {
+        // Calculate total nutrition whenever meal plan items change
+        const totals = mealPlanItems.reduce((acc, item) => ({
+            calories: acc.calories + (parseFloat(item.calories) || 0),
+            protein: acc.protein + (parseFloat(item.protein) || 0),
+            carbs: acc.carbs + (parseFloat(item.carbohydrates) || 0),
+            fat: acc.fat + (parseFloat(item.fat) || 0),
+            sodium: acc.sodium + (parseFloat(item.sodium) || 0),
+            dietaryFiber: acc.dietaryFiber + (parseFloat(item.dietary_fiber) || 0)
+        }), {
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            sodium: 0,
+            dietaryFiber: 0
+        });
+        setTotalNutrition(totals);
+    }, [mealPlanItems]);
 
     const handleLogout = async () => {
         try {
@@ -45,34 +71,46 @@ const ProfileDetails = ({ navigation }) => {
     };
 
 
-const fetchMealPlanItems = async (userId) => {
-    try {
-        const response = await fetch(`http://${domain}:3000/meal-planner/${userId}`);
-        if (!response.ok) throw new Error('Failed to fetch meal plan');
-        
-        const data = await response.json();
-        
-        // Sanitize and format the data
-        const formattedData = data.map(item => ({
-            meal_plan_id: item.meal_plan_id?.toString() || Math.random().toString(),
-            food_id: item.food_id?.toString() || '',
-            food_name: item.food_name?.toString() || 'Unnamed Item',
-            dining_hall: item.dining_hall?.toString() || '',
-            calories: item.calories ? Number(item.calories) : null,
-            serving_size: item.serving_size?.toString() || '',
-            is_vegetarian: Boolean(item.is_vegetarian),
-            is_vegan: Boolean(item.is_vegan),
-        }));
-
-        setMealPlanItems(formattedData);
-    } catch (error) {
-        console.error('Error fetching meal plan:', error);
-        Alert.alert('Error', 'Failed to load meal plan');
-        setMealPlanItems([]); // Set empty array on error
-    } finally {
-        setLoading(false);
-    }
-};
+    const fetchMealPlanItems = async (userId) => {
+        try {
+            const response = await fetch(`http://${domain}:3000/meal-planner/${userId}`);
+            if (!response.ok) throw new Error('Failed to fetch meal plan');
+            
+            const data = await response.json();
+            
+            // Sanitize and format the data
+            const formattedData = data.map(item => {
+                // Convert servings to number and default to 1 if not present
+                const servings = Number(item.servings) || 1;
+                
+                return {
+                    meal_plan_id: item.meal_plan_id?.toString() || Math.random().toString(),
+                    food_id: item.food_id?.toString() || '',
+                    food_name: item.food_name?.toString() || 'Unnamed Item',
+                    dining_hall: item.dining_hall?.toString() || '',
+                    servings: servings,
+                    serving_size: item.serving_size?.toString() || '',
+                    is_vegetarian: Boolean(item.is_vegetarian),
+                    is_vegan: Boolean(item.is_vegan),
+                    // Scale all nutritional values by number of servings
+                    calories: item.calories ? Math.round(Number(item.calories) * servings) : 0,
+                    protein: item.protein ? Math.round(Number(item.protein) * servings) : 0,
+                    carbohydrates: item.carbohydrates ? Math.round(Number(item.carbohydrates) * servings) : 0,
+                    fat: item.fat ? Math.round(Number(item.fat) * servings) : 0,
+                    sodium: item.sodium ? Math.round(Number(item.sodium) * servings) : 0,
+                    dietary_fiber: item.dietary_fiber ? Math.round(Number(item.dietary_fiber) * servings) : 0
+                };
+            });
+    
+            setMealPlanItems(formattedData);
+        } catch (error) {
+            console.error('Error fetching meal plan:', error);
+            Alert.alert('Error', 'Failed to load meal plan');
+            setMealPlanItems([]); // Set empty array on error
+        } finally {
+            setLoading(false);
+        }
+    };
 
 const removeMealPlanItem = async (item) => {
     try {
@@ -92,10 +130,10 @@ const removeMealPlanItem = async (item) => {
 };
 
 const renderMealPlanItem = ({ item }) => {
-    // Format the details safely
     const details = [
         item.dining_hall,
         item.calories ? `${item.calories} cal` : null,
+        `${item.servings} serving${item.servings !== 1 ? 's' : ''}`,
         item.serving_size
     ].filter(Boolean).join(' • ');
 
@@ -105,11 +143,14 @@ const renderMealPlanItem = ({ item }) => {
                 <Text style={styles.itemName} numberOfLines={2}>
                     {item.food_name}
                 </Text>
-                {details ? (
-                    <Text style={styles.itemDetails} numberOfLines={1}>
-                        {details}
+                <Text style={styles.itemDetails} numberOfLines={1}>
+                    {details}
+                </Text>
+                <View style={styles.nutritionInfo}>
+                    <Text style={styles.nutritionText}>
+                        P: {item.protein}g • C: {item.carbohydrates}g • F: {item.fat}g
                     </Text>
-                ) : null}
+                </View>
                 <View style={styles.tagsContainer}>
                     {item.is_vegetarian && (
                         <Text style={styles.dietaryTag}>Vegetarian</Text>
@@ -152,21 +193,23 @@ const renderMealPlanItem = ({ item }) => {
 
     return (
         <View style={styles.container}>
+            {/* Header Buttons */}
             <TouchableOpacity 
                 style={styles.diningHallsButton}
                 onPress={navigateToDiningHalls}
             >
                 <Text style={styles.diningHallsButtonText}>View Dining Halls</Text>
             </TouchableOpacity>
-
+    
             <TouchableOpacity 
                 style={styles.logoutButton}
                 onPress={handleLogout}
             >
                 <Text style={styles.logoutButtonText}>Logout</Text>
             </TouchableOpacity>
-
+    
             <View style={styles.contentContainer}>
+                {/* Profile Information */}
                 <Text style={styles.title}>Profile</Text>
                 <View style={styles.infoContainer}>
                     <View style={styles.row}>
@@ -174,18 +217,113 @@ const renderMealPlanItem = ({ item }) => {
                         <Text style={styles.info}>{user?.email || 'Not available'}</Text>
                     </View>
                 </View>
-
+    
+                {/* Nutritional Summary */}
+                <View style={styles.totalNutrition}>
+                    <Text style={styles.totalNutritionTitle}>Daily Totals</Text>
+                    <View style={styles.nutritionGrid}>
+                        <View style={styles.nutritionItem}>
+                            <Text style={styles.nutritionValue}>
+                                {totalNutrition.calories}
+                            </Text>
+                            <Text style={styles.nutritionLabel}>Calories</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                            <Text style={styles.nutritionValue}>
+                                {totalNutrition.protein}g
+                            </Text>
+                            <Text style={styles.nutritionLabel}>Protein</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                            <Text style={styles.nutritionValue}>
+                                {totalNutrition.carbs}g
+                            </Text>
+                            <Text style={styles.nutritionLabel}>Carbs</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                            <Text style={styles.nutritionValue}>
+                                {totalNutrition.fat}g
+                            </Text>
+                            <Text style={styles.nutritionLabel}>Fat</Text>
+                        </View>
+                    </View>
+                </View>
+    
+                {/* Meal Planner Section */}
                 <Text style={styles.sectionTitle}>Meal Planner</Text>
-                <FlatList
-                    data={mealPlanItems}
-                    keyExtractor={(item) => `meal-plan-${item.meal_plan_id}`}
-                    renderItem={renderMealPlanItem}
-                    ListEmptyComponent={
-                        <Text style={styles.emptyMessage}>
-                        No items in your meal planner. Add items from the menu!
-                        </Text>
-                 }
-                />
+                
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#007AFF" />
+                    </View>
+                ) : (
+                    <FlatList
+                        data={mealPlanItems}
+                        keyExtractor={(item) => `meal-plan-${item.meal_plan_id}`}
+                        renderItem={({ item }) => (
+                            <View style={styles.mealPlanItem}>
+                                <View style={styles.itemInfo}>
+                                    {/* Item Name and Basic Info */}
+                                    <Text style={styles.itemName} numberOfLines={2}>
+                                        {item.food_name}
+                                    </Text>
+                                    
+                                    {/* Location and Serving Info */}
+                                    <Text style={styles.itemDetails} numberOfLines={1}>
+                                        {[
+                                            item.dining_hall,
+                                            `${item.servings} serving${item.servings !== 1 ? 's' : ''}`,
+                                            item.serving_size
+                                        ].filter(Boolean).join(' • ')}
+                                    </Text>
+    
+                                    {/* Nutritional Information */}
+                                    <View style={styles.itemNutrition}>
+                                        <Text style={styles.nutritionPrimary}>
+                                            {item.calories} calories
+                                        </Text>
+                                    </View>
+    
+                                    {/* Dietary Tags */}
+                                    <View style={styles.tagsContainer}>
+                                        {item.is_vegetarian && (
+                                            <Text style={styles.dietaryTag}>Vegetarian</Text>
+                                        )}
+                                        {item.is_vegan && (
+                                            <Text style={styles.dietaryTag}>Vegan</Text>
+                                        )}
+                                    </View>
+                                </View>
+    
+                                {/* Remove Button */}
+                                <TouchableOpacity
+                                    style={styles.removeButton}
+                                    onPress={() => {
+                                        Alert.alert(
+                                            'Remove Item',
+                                            'Are you sure you want to remove this item from your meal plan?',
+                                            [
+                                                { text: 'Cancel', style: 'cancel' },
+                                                { 
+                                                    text: 'Remove', 
+                                                    onPress: () => removeMealPlanItem(item), 
+                                                    style: 'destructive' 
+                                                }
+                                            ]
+                                        );
+                                    }}
+                                >
+                                    <Text style={styles.removeButtonText}>Remove</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                        ListEmptyComponent={
+                            <Text style={styles.emptyMessage}>
+                                No items in your meal planner. Add items from the menu!
+                            </Text>
+                        }
+                    />
+                )}
             </View>
         </View>
     );
@@ -368,6 +506,45 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontSize: 16,
         color: '#999',
+    },
+    totalNutrition: {
+        backgroundColor: 'white',
+        borderRadius: 10,
+        padding: 15,
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    totalNutritionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+    },
+    nutritionGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    nutritionItem: {
+        alignItems: 'center',
+    },
+    nutritionValue: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#4CAF50',
+    },
+    nutritionLabel: {
+        fontSize: 14,
+        color: '#666',
+    },
+    nutritionInfo: {
+        marginVertical: 4,
+    },
+    nutritionText: {
+        fontSize: 14,
+        color: '#666',
     },
 });
 

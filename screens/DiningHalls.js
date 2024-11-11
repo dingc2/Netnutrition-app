@@ -5,7 +5,6 @@ import { auth } from '../firebase';
 import { Platform } from 'react-native';
 import { DB_DOMAIN } from '@env';
 
-//TODO make http link not hard coded
 const DiningHalls = ({ navigation }) => {
     const [diningHalls, setDiningHalls] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -24,7 +23,16 @@ const DiningHalls = ({ navigation }) => {
                 const hoursData = await hoursResponse.json();
                 return { ...hall, hours: hoursData };
             }));
-            setDiningHalls(hallsWithHours);
+            
+            // Sort dining halls by open status
+            const sortedHalls = hallsWithHours.sort((a, b) => {
+                const aIsOpen = checkIfOpen(a.hours);
+                const bIsOpen = checkIfOpen(b.hours);
+                if (aIsOpen === bIsOpen) return 0;
+                return aIsOpen ? -1 : 1;
+            });
+            
+            setDiningHalls(sortedHalls);
             setLoading(false);
         } catch (error) {
             console.error('Error fetching dining halls:', error);
