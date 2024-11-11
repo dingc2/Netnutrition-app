@@ -39,6 +39,7 @@ const Login = ({ navigation }) => {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                testID="email-input"
             />
             <TextInput
                 style={styles.input}
@@ -46,11 +47,13 @@ const Login = ({ navigation }) => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={true}
+                testID="password-input"
             />
             <Button 
                 title={loading ? "Loading..." : "Log In"} 
                 onPress={handleLogin}
                 disabled={loading}
+                testID="login-button"
             />
             <Text style={styles.registerPrompt}>
                 Don't have an account? <Text onPress={() => navigation.navigate('Registration')} style={styles.link}>Register here</Text>

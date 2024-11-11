@@ -6,7 +6,6 @@ const HoursScreen = ({ route }) => {
     const { hallName } = route.params;
     const [hours, setHours] = useState([]);
     const domain = DB_DOMAIN;
-    // const url = "http://" + domain + ":3000/dining-halls/${hallId}/hours";
 
     useEffect(() => {
         fetchHours();

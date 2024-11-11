@@ -490,6 +490,7 @@ const MenuScreen = ({ route }) => {
             <View style={styles.centerContainer}>
                 <Text style={styles.errorText}>{error}</Text>
                 <TouchableOpacity 
+                    testID="retry-button"
                     style={styles.retryButton}
                     onPress={() => fetchMenuForDay(selectedDay)}
                 >
@@ -560,7 +561,7 @@ return (
 
         {isLoading ? (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator testID="loading-indicator" size="large" color="#007AFF" />
             </View>
         ) : (
             <FlatList
@@ -648,6 +649,7 @@ return (
                     
                     <View style={styles.servingInputContainer}>
                         <TextInput
+                            testID="serving-input"
                             style={styles.servingInput}
                             value={selectedServings}
                             onChangeText={setSelectedServings}

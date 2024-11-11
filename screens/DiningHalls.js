@@ -8,6 +8,7 @@ import { DB_DOMAIN } from '@env';
 const DiningHalls = ({ navigation }) => {
     const [diningHalls, setDiningHalls] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const domain = DB_DOMAIN;
 
     useEffect(() => {
@@ -18,14 +19,12 @@ const DiningHalls = ({ navigation }) => {
         try {
             const response = await fetch(`http://${domain}:3000/dining-halls`);
             const data = await response.json();
-            console.log(response);
             const hallsWithHours = await Promise.all(data.map(async (hall) => {
                 const hoursResponse = await fetch(`http://${domain}:3000/dining-halls/${hall.name}/hours`);
                 const hoursData = await hoursResponse.json();
                 return { ...hall, hours: hoursData };
             }));
             
-            // Sort dining halls by open status
             const sortedHalls = hallsWithHours.sort((a, b) => {
                 const aIsOpen = checkIfOpen(a.hours);
                 const bIsOpen = checkIfOpen(b.hours);
@@ -34,9 +33,10 @@ const DiningHalls = ({ navigation }) => {
             });
             
             setDiningHalls(sortedHalls);
-            setLoading(false);
         } catch (error) {
             console.error('Error fetching dining halls:', error);
+            setError('Failed to fetch dining halls');
+        } finally {
             setLoading(false);
         }
     };
@@ -64,7 +64,6 @@ const DiningHalls = ({ navigation }) => {
 
         const todayHours = hours.find(h => h.day === currentDay);
         if (todayHours) {
-            // Check each meal period
             const { meals } = todayHours;
             return Object.values(meals).some(meal => {
                 if (!meal) return false;
@@ -81,7 +80,23 @@ const DiningHalls = ({ navigation }) => {
     if (loading) {
         return (
             <View style={[styles.container, styles.centered]}>
-                <ActivityIndicator size="large" color="#0000ff" />
+                <ActivityIndicator testID="loading-indicator" size="large" color="#0000ff" />
+            </View>
+        );
+    }
+
+    if (error) {
+        return (
+            <View style={[styles.container, styles.centered]}>
+                <Text>{error}</Text>
+            </View>
+        );
+    }
+
+    if (diningHalls.length === 0) {
+        return (
+            <View style={[styles.container, styles.centered]}>
+                <Text>No dining halls available</Text>
             </View>
         );
     }
@@ -89,10 +104,10 @@ const DiningHalls = ({ navigation }) => {
     return (
         <View style={styles.container}>
             <View style={styles.navBar}>
-                <TouchableOpacity onPress={openWaitTimes} style={styles.navButton}>
+                <TouchableOpacity testID="wait-times-button" onPress={openWaitTimes} style={styles.navButton}>
                     <Text style={styles.linkText}>See Current Wait Times</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleProfilePress} style={styles.navButton}>
+                <TouchableOpacity testID="profile-button" onPress={handleProfilePress} style={styles.navButton}>
                     <Icon name="user" size={24} color="#000" />
                     <Text style={styles.navText}>Profile</Text>
                     {auth.currentUser && (
@@ -102,6 +117,7 @@ const DiningHalls = ({ navigation }) => {
             </View>
 
             <FlatList
+                testID="dining-halls-list"
                 data={diningHalls}
                 keyExtractor={(item) => item.name}
                 renderItem={({ item }) => (
@@ -123,6 +139,7 @@ const DiningHalls = ({ navigation }) => {
                         <View style={styles.buttonContainer}>
                             <View style={styles.button}>
                                 <Button
+                                    testID={`view-hours-${item.name}`}
                                     title="View Hours"
                                     onPress={() => navigation.navigate('HoursScreen', { 
                                         hallName: item.name 
@@ -131,6 +148,7 @@ const DiningHalls = ({ navigation }) => {
                             </View>
                             <View style={styles.button}>
                                 <Button
+                                    testID={`view-menu-${item.name}`}
                                     title="View Menu"
                                     onPress={() => navigation.navigate('MenuScreen', { 
                                         hallName: item.name 

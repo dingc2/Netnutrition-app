@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
 );
 
 -- Load data from CSV file
-LOAD DATA INFILE 'C:/Users/Tobiah/netnutrition-app/sql-scripts/dining_meals_nutrition.csv'
+LOAD DATA INFILE '/Users/sung-linhsieh/Desktop/Netnutrition-app/sql-scripts-scrapers/dining_meals_nutrition.csv'
 INTO TABLE menu_items
 FIELDS TERMINATED BY ','
 ENCLOSED BY '"'

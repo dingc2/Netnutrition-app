@@ -14,7 +14,7 @@ CREATE TABLE dining_hours (
 
 
 -- Load the CSV data
-LOAD DATA INFILE 'C:/Users/Tobiah/netnutrition-app/sql-scripts/dininghall_hours.csv'
+LOAD DATA INFILE '/Users/sung-linhsieh/Desktop/Netnutrition-app/sql-scripts-scrapers/dininghall_hours.csv'
 INTO TABLE dining_hours
 FIELDS TERMINATED BY ','
 LINES TERMINATED BY '\n'

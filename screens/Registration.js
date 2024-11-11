@@ -1,7 +1,8 @@
+// screens/Registration.js
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import { auth } from '../firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth } from '../firebase';
 
 const RegisterScreen = ({ navigation }) => {
     const [name, setName] = useState('');
@@ -9,9 +10,24 @@ const RegisterScreen = ({ navigation }) => {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const validateEmail = (email) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
+
     const handleRegister = async () => {
         if (!name || !email || !password) {
             Alert.alert('Error', 'Please fill out all fields.');
+            return;
+        }
+
+        if (!validateEmail(email)) {
+            Alert.alert('Error', 'Please enter a valid email address.');
+            return;
+        }
+
+        if (password.length < 6) {
+            Alert.alert('Error', 'Password must be at least 6 characters long.');
             return;
         }
 
@@ -20,7 +36,6 @@ const RegisterScreen = ({ navigation }) => {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             
-            // Update user profile with display name
             await updateProfile(user, {
                 displayName: name
             });
@@ -42,6 +57,7 @@ const RegisterScreen = ({ navigation }) => {
                 placeholder="Name"
                 value={name}
                 onChangeText={setName}
+                testID="name-input"
             />
             <TextInput
                 style={styles.input}
@@ -50,6 +66,7 @@ const RegisterScreen = ({ navigation }) => {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                testID="email-input"
             />
             <TextInput
                 style={styles.input}
@@ -57,14 +74,25 @@ const RegisterScreen = ({ navigation }) => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={true}
+                testID="password-input"
             />
-            <Button 
-                title={loading ? "Loading..." : "Register"}
-                onPress={handleRegister}
-                disabled={loading}
-            />
+            <View style={styles.buttonContainer}>
+                <Button 
+                    title={loading ? "Loading..." : "Register"}
+                    onPress={handleRegister}
+                    disabled={loading}
+                    testID="register-button"
+                />
+            </View>
             <Text style={styles.loginPrompt}>
-                Already have an account? <Text onPress={() => navigation.navigate('Login')} style={styles.link}>Login here</Text>
+                Already have an account? {' '}
+                <Text 
+                    onPress={() => navigation.navigate('Login')} 
+                    style={styles.link}
+                    testID="login-link"
+                >
+                    Login here
+                </Text>
             </Text>
         </View>
     );
