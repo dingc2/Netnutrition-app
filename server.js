@@ -325,11 +325,12 @@ app.get('/menu-items/:foodId/nutrition', (req, res) => {
 
 // Add item to meal planner
 // In server.js, update the add endpoint
+// Add item to meal planner
 app.post('/meal-planner/add', (req, res) => {
     const { 
         userId, 
         foodId, 
-        diningHall, 
+        diningHall,
         servings,
         calories,
         protein,
@@ -343,6 +344,25 @@ app.post('/meal-planner/add', (req, res) => {
         res.status(400).json({ error: 'Missing required fields' });
         return;
     }
+
+    // Parse numerical values, removing 'g' or 'mg' and converting to numbers
+    const parseNutritionValue = (value) => {
+        if (typeof value === 'string') {
+            // Remove any units (g, mg) and convert to number
+            const numStr = value.replace(/[^0-9.-]/g, '');
+            return parseFloat(numStr) || 0;
+        }
+        return parseFloat(value) || 0;
+    };
+
+    const scaledValues = {
+        calories: Math.round(parseFloat(calories) || 0),
+        protein: Math.round(parseNutritionValue(protein)),
+        fat: Math.round(parseNutritionValue(fat)),
+        carbohydrates: Math.round(parseNutritionValue(carbohydrates)),
+        sodium: Math.round(parseNutritionValue(sodium)),
+        dietary_fiber: Math.round(parseNutritionValue(dietaryFiber))
+    };
 
     const query = `
         INSERT INTO meal_planner (
@@ -374,12 +394,12 @@ app.post('/meal-planner/add', (req, res) => {
         foodId, 
         diningHall, 
         servings,
-        calories,
-        protein,
-        fat,
-        carbohydrates,
-        sodium,
-        dietaryFiber
+        scaledValues.calories,
+        scaledValues.protein,
+        scaledValues.fat,
+        scaledValues.carbohydrates,
+        scaledValues.sodium,
+        scaledValues.dietary_fiber
     ], (err, result) => {
         if (err) {
             handleDatabaseError(err, res);
@@ -421,19 +441,15 @@ app.get('/meal-planner/:userId', (req, res) => {
         mp.dining_hall,
         f.food_name,
         f.serving_size,
-        f.calories,
-        f.protein,
-        f.total_fat,
-        f.total_carbohydrates,
-        f.dietary_fiber,
-        f.sodium,
-        f.is_vegetarian,
-        f.is_vegan,
-        mp.servings,  -- Make sure we get the servings
         mp.calories as scaled_calories,
         mp.protein as scaled_protein,
         mp.fat as scaled_fat,
-        mp.carbohydrates as scaled_carbohydrates
+        mp.carbohydrates as scaled_carbohydrates,
+        mp.sodium as scaled_sodium,
+        mp.dietary_fiber as scaled_dietary_fiber,
+        f.is_vegetarian,
+        f.is_vegan,
+        mp.servings
     FROM meal_planner mp
     JOIN foods f ON mp.food_id = f.food_id
     WHERE mp.user_id = ?
@@ -446,10 +462,16 @@ app.get('/meal-planner/:userId', (req, res) => {
             return handleDatabaseError(err, res);
         }
         
-        // Transform results to ensure unique IDs
+        // Transform results to ensure proper numeric values
         const transformedResults = results.map(item => ({
             ...item,
-            id: item.meal_plan_id, // Use the meal_planner table's id as the unique identifier
+            id: item.meal_plan_id,
+            scaled_calories: parseFloat(item.scaled_calories) || 0,
+            scaled_protein: parseFloat(item.scaled_protein) || 0,
+            scaled_fat: parseFloat(item.scaled_fat) || 0,
+            scaled_carbohydrates: parseFloat(item.scaled_carbohydrates) || 0,
+            scaled_sodium: parseFloat(item.scaled_sodium) || 0,
+            scaled_dietary_fiber: parseFloat(item.scaled_dietary_fiber) || 0
         }));
         
         res.json(transformedResults || []);

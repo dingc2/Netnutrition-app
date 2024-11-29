@@ -36,15 +36,18 @@ const ProfileDetails = ({ navigation }) => {
     }, []);
 
     useEffect(() => {
-        // Calculate total nutrition whenever meal plan items change
-        const totals = mealPlanItems.reduce((acc, item) => ({
-            calories: acc.calories + (parseFloat(item.calories) || 0),
-            protein: acc.protein + (parseFloat(item.protein) || 0),
-            carbs: acc.carbs + (parseFloat(item.carbohydrates) || 0),
-            fat: acc.fat + (parseFloat(item.fat) || 0),
-            sodium: acc.sodium + (parseFloat(item.sodium) || 0),
-            dietaryFiber: acc.dietaryFiber + (parseFloat(item.dietary_fiber) || 0)
-        }), {
+        
+        const totals = mealPlanItems.reduce((acc, item) => {
+    
+            return {
+                calories: acc.calories + (Number(item.scaled_calories) || 0),
+                protein: acc.protein + (Number(item.scaled_protein) || 0),
+                carbs: acc.carbs + (Number(item.scaled_carbohydrates) || 0),
+                fat: acc.fat + (Number(item.scaled_fat) || 0),
+                sodium: acc.sodium + (Number(item.scaled_sodium) || 0),
+                dietaryFiber: acc.dietaryFiber + (Number(item.scaled_dietary_fiber) || 0)
+            };
+        }, {
             calories: 0,
             protein: 0,
             carbs: 0,
@@ -52,7 +55,15 @@ const ProfileDetails = ({ navigation }) => {
             sodium: 0,
             dietaryFiber: 0
         });
-        setTotalNutrition(totals);
+    
+        setTotalNutrition({
+            calories: Math.round(totals.calories),
+            protein: Math.round(totals.protein),
+            carbs: Math.round(totals.carbs),
+            fat: Math.round(totals.fat),
+            sodium: Math.round(totals.sodium),
+            dietaryFiber: Math.round(totals.dietaryFiber)
+        });
     }, [mealPlanItems]);
 
     const handleLogout = async () => {
@@ -80,28 +91,23 @@ const ProfileDetails = ({ navigation }) => {
             const data = await response.json();
             
             // Sanitize and format the data
-            const formattedData = data.map(item => {
-                // Convert servings to number and default to 1 if not present
-                const servings = Number(item.servings) || 1;
-                
-                return {
-                    meal_plan_id: item.meal_plan_id?.toString() || Math.random().toString(),
-                    food_id: item.food_id?.toString() || '',
-                    food_name: item.food_name?.toString() || 'Unnamed Item',
-                    dining_hall: item.dining_hall?.toString() || '',
-                    servings: servings,
-                    serving_size: item.serving_size?.toString() || '',
-                    is_vegetarian: Boolean(item.is_vegetarian),
-                    is_vegan: Boolean(item.is_vegan),
-                    // Scale all nutritional values by number of servings
-                    calories: item.calories ? Math.round(Number(item.calories) * servings) : 0,
-                    protein: item.protein ? Math.round(Number(item.protein) * servings) : 0,
-                    carbohydrates: item.carbohydrates ? Math.round(Number(item.carbohydrates) * servings) : 0,
-                    fat: item.fat ? Math.round(Number(item.fat) * servings) : 0,
-                    sodium: item.sodium ? Math.round(Number(item.sodium) * servings) : 0,
-                    dietary_fiber: item.dietary_fiber ? Math.round(Number(item.dietary_fiber) * servings) : 0
-                };
-            });
+            const formattedData = data.map(item => ({
+                meal_plan_id: item.meal_plan_id?.toString() || Math.random().toString(),
+                food_id: item.food_id?.toString() || '',
+                food_name: item.food_name?.toString() || 'Unnamed Item',
+                dining_hall: item.dining_hall?.toString() || '',
+                servings: Number(item.servings) || 1,
+                serving_size: item.serving_size?.toString() || '',
+                is_vegetarian: Boolean(item.is_vegetarian),
+                is_vegan: Boolean(item.is_vegan),
+                // Keep the scaled values from the server
+                scaled_calories: Number(item.scaled_calories) || 0,
+                scaled_protein: Number(item.scaled_protein) || 0,
+                scaled_carbohydrates: Number(item.scaled_carbohydrates) || 0,
+                scaled_fat: Number(item.scaled_fat) || 0,
+                scaled_sodium: Number(item.scaled_sodium) || 0,
+                scaled_dietary_fiber: Number(item.scaled_dietary_fiber) || 0
+            }));
     
             setMealPlanItems(formattedData);
         } catch (error) {
@@ -260,12 +266,6 @@ const renderMealPlanItem = ({ item }) => {
                                             item.serving_size
                                         ].filter(Boolean).join(' • ')}
                                     </Text>
-     
-                                    <View style={styles.itemNutrition}>
-                                        <Text style={styles.nutritionPrimary}>
-                                            {item.calories} calories
-                                        </Text>
-                                    </View>
      
                                     <View style={styles.tagsContainer}>
                                         {item.is_vegetarian && (

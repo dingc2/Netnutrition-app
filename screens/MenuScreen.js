@@ -191,17 +191,24 @@ const MenuScreen = ({ navigation, route }) => {
         }
     
         try {
-            // First fetch the base nutritional info
             const nutritionInfo = await fetchNutritionalInfoForPlanner(itemToAdd.id);
             
+            // Extract numerical values from strings with units
+            const parseNutritionValue = (value) => {
+                if (typeof value === 'string') {
+                    return parseFloat(value.replace(/[^0-9.-]/g, '')) || 0;
+                }
+                return parseFloat(value) || 0;
+            };
+    
             // Scale all nutritional values based on servings
             const scaledNutrition = {
                 calories: Math.round(nutritionInfo.nutrients.calories * servings),
-                protein: Math.round(nutritionInfo.nutrients.protein * servings),
-                totalFat: Math.round(nutritionInfo.nutrients.fat * servings),
-                totalCarbohydrates: Math.round(nutritionInfo.nutrients.carbohydrates * servings),
-                sodium: Math.round(nutritionInfo.nutrients.sodium * servings),
-                dietaryFiber: Math.round(nutritionInfo.nutrients.dietaryFiber * servings)
+                protein: Math.round(parseNutritionValue(nutritionInfo.nutrients.protein) * servings),
+                fat: Math.round(parseNutritionValue(nutritionInfo.nutrients.totalFat) * servings),
+                carbohydrates: Math.round(parseNutritionValue(nutritionInfo.nutrients.totalCarbohydrates) * servings),
+                sodium: Math.round(parseNutritionValue(nutritionInfo.nutrients.sodium) * servings),
+                dietaryFiber: Math.round(parseNutritionValue(nutritionInfo.nutrients.dietaryFiber) * servings)
             };
     
             const response = await fetch(`http://${domain}:3000/meal-planner/add`, {
@@ -214,17 +221,7 @@ const MenuScreen = ({ navigation, route }) => {
                     foodId: itemToAdd.id,
                     diningHall: hallName,
                     servings: servings,
-                    foodName: itemToAdd.name,
-                    servingSize: nutritionInfo.servingSize,
-                    isVegetarian: itemToAdd.dietaryInfo.vegetarian,
-                    isVegan: itemToAdd.dietaryInfo.vegan,
-                    // Send the scaled nutrition values
-                    calories: scaledNutrition.calories,
-                    protein: scaledNutrition.protein,
-                    fat: scaledNutrition.totalFat,
-                    carbohydrates: scaledNutrition.totalCarbohydrates,
-                    sodium: scaledNutrition.sodium,
-                    dietaryFiber: scaledNutrition.dietaryFiber
+                    ...scaledNutrition
                 }),
             });
     
