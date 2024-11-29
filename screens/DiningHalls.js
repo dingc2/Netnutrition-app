@@ -1,20 +1,43 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { auth } from '../firebase';
-import { Platform } from 'react-native';
 import { DB_DOMAIN } from '@env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import CustomBottomNav from '../navigation/CustomButtonNav';
 
 const DiningHalls = ({ navigation }) => {
     const [diningHalls, setDiningHalls] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [favorites, setFavorites] = useState([]);
     const domain = DB_DOMAIN;
 
-    useEffect(() => {
-        fetchDiningHalls();
-    }, []);
-
-    const fetchDiningHalls = async () => {
+    const loadFavorites = async () => {
+        try {
+            const userId = auth.currentUser?.uid || 'guest';
+            const stored = await AsyncStorage.getItem(`favorites_${userId}`);
+            return stored ? JSON.parse(stored) : [];
+        } catch (error) {
+            console.error('Error loading favorites:', error);
+            return [];
+        }
+    };
+    
+    const sortDiningHalls = (halls, currentFavorites = favorites) => {
+        const sorted = [...halls].sort((a, b) => {
+            const aIsFavorite = currentFavorites.includes(a.name);
+            const bIsFavorite = currentFavorites.includes(b.name);
+            const aIsOpen = checkIfOpen(a.hours);
+            const bIsOpen = checkIfOpen(b.hours);
+     
+            if (aIsFavorite !== bIsFavorite) return aIsFavorite ? -1 : 1;
+            if (aIsOpen !== bIsOpen) return aIsOpen ? -1 : 1;
+            return 0;
+        });
+        setDiningHalls(sorted);
+     };
+     
+     const fetchDiningHalls = async (userFavorites) => {
         try {
             const response = await fetch(`http://${domain}:3000/dining-halls`);
             const data = await response.json();
@@ -24,21 +47,38 @@ const DiningHalls = ({ navigation }) => {
                 return { ...hall, hours: hoursData };
             }));
             
-            // Sort dining halls by open status
-            const sortedHalls = hallsWithHours.sort((a, b) => {
-                const aIsOpen = checkIfOpen(a.hours);
-                const bIsOpen = checkIfOpen(b.hours);
-                if (aIsOpen === bIsOpen) return 0;
-                return aIsOpen ? -1 : 1;
-            });
-            
-            setDiningHalls(sortedHalls);
+            setFavorites(userFavorites);
+            sortDiningHalls(hallsWithHours, userFavorites);
             setLoading(false);
         } catch (error) {
             console.error('Error fetching dining halls:', error);
             setLoading(false);
         }
+     };
+    
+    useEffect(() => {
+        async function init() {
+            const userFavorites = await loadFavorites();
+            fetchDiningHalls(userFavorites);
+        }
+        init();
+    }, []);
+
+    const toggleFavorite = async (hallName) => {
+        try {
+            const userId = auth.currentUser?.uid || 'guest';
+            const newFavorites = favorites.includes(hallName)
+                ? favorites.filter(name => name !== hallName)
+                : [...favorites, hallName];
+            
+            setFavorites(newFavorites);
+            await AsyncStorage.setItem(`favorites_${userId}`, JSON.stringify(newFavorites));
+            sortDiningHalls(diningHalls, newFavorites);
+        } catch (error) {
+            console.error('Error saving favorite:', error);
+        }
     };
+
 
     const handleProfilePress = () => {
         const user = auth.currentUser;
@@ -63,9 +103,7 @@ const DiningHalls = ({ navigation }) => {
 
         const todayHours = hours.find(h => h.day === currentDay);
         if (todayHours) {
-            // Check each meal period
-            const { meals } = todayHours;
-            return Object.values(meals).some(meal => {
+            return Object.values(todayHours.meals).some(meal => {
                 if (!meal) return false;
                 return currentTime >= meal.open && currentTime < meal.close;
             });
@@ -87,135 +125,139 @@ const DiningHalls = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.navBar}>
-                <TouchableOpacity onPress={openWaitTimes} style={styles.navButton}>
-                    <Text style={styles.linkText}>See Current Wait Times</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleProfilePress} style={styles.navButton}>
-                    <Icon name="user" size={24} color="#000" />
-                    <Text style={styles.navText}>Profile</Text>
-                    {auth.currentUser && (
-                        <View style={styles.authIndicator} />
-                    )}
-                </TouchableOpacity>
+            <View style={styles.contentContainer}>
+                <FlatList
+                    data={diningHalls}
+                    keyExtractor={(item) => item.name}
+                    renderItem={({ item }) => {
+                        const isOpen = checkIfOpen(item.hours);
+                        const isFavorite = favorites.includes(item.name);
+                        return (
+                            <TouchableOpacity
+                                style={[styles.card, isOpen && styles.openCard]}
+                                onPress={() => navigation.navigate('MenuScreen', { hallName: item.name })}
+                            >
+                                <View style={styles.cardHeader}>
+                                    <Text style={styles.hallName}>{item.name}</Text>
+                                    <TouchableOpacity
+                                        onPress={() => toggleFavorite(item.name)}
+                                        style={styles.favoriteButton}
+                                    >
+                                        <Icon
+                                            name={isFavorite ? "star" : "star-o"}
+                                            size={24}
+                                            color={isFavorite ? "#FFD700" : "#666"}
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={styles.cardContent}>
+                                    <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
+                                        <Text style={styles.statusText}>
+                                            {isOpen ? 'OPEN' : 'CLOSED'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.cardActions}>
+                                        <TouchableOpacity
+                                            style={styles.actionButton}
+                                            onPress={() => navigation.navigate('MenuScreen', { hallName: item.name })}
+                                        >
+                                            <Icon name="cutlery" size={16} color="#fff" />
+                                            <Text style={styles.actionText}>Menu</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.actionButton}
+                                            onPress={() => navigation.navigate('HoursScreen', { hallName: item.name })}
+                                        >
+                                            <Icon name="clock-o" size={16} color="#fff" />
+                                            <Text style={styles.actionText}>Hours</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }}
+                />
             </View>
-
-            <FlatList
-                data={diningHalls}
-                keyExtractor={(item) => item.name}
-                renderItem={({ item }) => (
-                    <View style={styles.item}>
-                        <View style={styles.contentContainer}>
-                            <Text style={styles.text}>{item.name}</Text>
-                            <View style={styles.status}>
-                                <Icon
-                                    name="circle"
-                                    size={18}
-                                    color={checkIfOpen(item.hours) ? "green" : "red"}
-                                    style={styles.icon}
-                                />
-                                <Text style={styles.statusText}>
-                                    {checkIfOpen(item.hours) ? 'Open' : 'Closed'}
-                                </Text>
-                            </View>
-                        </View>
-                        <View style={styles.buttonContainer}>
-                            <View style={styles.button}>
-                                <Button
-                                    title="View Hours"
-                                    onPress={() => navigation.navigate('HoursScreen', { 
-                                        hallName: item.name 
-                                    })}
-                                />
-                            </View>
-                            <View style={styles.button}>
-                                <Button
-                                    title="View Menu"
-                                    onPress={() => navigation.navigate('MenuScreen', { 
-                                        hallName: item.name 
-                                    })}
-                                />
-                            </View>
-                        </View>
-                    </View>
-                )}
-            />
+            <CustomBottomNav navigation={navigation} currentScreen="DiningHalls" />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
+    contentContainer: {
+        flex: 1,
+        paddingBottom: 60,
+    },
     container: {
         flex: 1,
-        padding: 20,
-        backgroundColor: '#99773d',
+        backgroundColor: '#fff',
     },
-    navBar: {
+    card: {
+        backgroundColor: '#f5f5f5',
+        borderRadius: 12,
+        margin: 8,
+        padding: 16,
+        elevation: 2,
+    },
+    openCard: {
+        borderLeftWidth: 4,
+        borderLeftColor: '#4CAF50',
+    },
+    hallName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 16,
+    },
+    cardContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingBottom: 20,
     },
-    navButton: {
+    cardHeader: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: 16,
     },
-    navText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginLeft: 10,
+    favoriteButton: {
+        padding: 8,
     },
-    linkText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#00008B', 
-        textDecorationLine: 'underline', 
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        marginRight: 12,
     },
-    authIndicator: {
-        position: 'absolute',
-        top: 15,
-        right: 60,
-        width: 8,
-        height: 8,
+    openBadge: {
         backgroundColor: '#4CAF50',
-        borderRadius: 4,
     },
-    item: {
-        padding: 15,
-        backgroundColor: '#ddd',
-        borderRadius: 5,
-        marginBottom: 10,
-        position: 'relative',
-    },
-    contentContainer: {
-        position: 'relative',
-        minHeight: 50,
-    },
-    text: {
-        fontSize: 18,
-    },
-    status: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-    },
-    icon: {
-        marginRight: 5,
+    closedBadge: {
+        backgroundColor: '#f44336',
     },
     statusText: {
-        fontSize: 16,
+        color: '#fff',
+        fontSize: 12,
         fontWeight: 'bold',
-        color: '#333',
     },
-    buttonContainer: {
+    cardActions: {
+        flex: 1,
         flexDirection: 'row',
-        justifyContent: 'flex-start',
-        marginTop: 10,
+        justifyContent: 'flex-end',
+        gap: 8,
     },
-    button: {
-        marginRight: 10,
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#99773d',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        gap: 6,
+    },
+    actionText: {
+        color: '#fff',
+        fontSize: 14,
     },
     centered: {
         justifyContent: 'center',

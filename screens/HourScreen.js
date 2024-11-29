@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { DB_DOMAIN } from '@env';
+import CustomBottomNav from '../navigation/CustomButtonNav';
 
-const HoursScreen = ({ route }) => {
+const HoursScreen = ({ navigation, route }) => {
     const { hallName } = route.params;
     const [hours, setHours] = useState([]);
     const domain = DB_DOMAIN;
@@ -57,16 +58,23 @@ const HoursScreen = ({ route }) => {
     return (
         <View style={styles.container}>
             <Text style={styles.title}>{hallName} - Hours</Text>
-            <FlatList
-                data={hours}
-                keyExtractor={(item) => item.day}
-                renderItem={renderDayItem}
-            />
+            <View style={styles.contentContainer}>
+                <FlatList
+                    data={hours}
+                    keyExtractor={(item) => item.day}
+                    renderItem={renderDayItem}
+                />
+            </View>
+            <CustomBottomNav navigation={navigation} currentScreen="HoursScreen" />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
+    contentContainer: {
+        flex: 1,
+        paddingBottom: 60,
+    },
     container: {
         flex: 1,
         padding: 20,

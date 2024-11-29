@@ -3,8 +3,9 @@ import { View, Text, TouchableOpacity, Modal, StyleSheet, ActivityIndicator, Scr
 import { AntDesign } from '@expo/vector-icons';
 import { auth } from '../firebase';
 import { DB_DOMAIN } from '@env';
+import CustomBottomNav from '../navigation/CustomButtonNav';
 
-const MenuScreen = ({ route }) => {
+const MenuScreen = ({ navigation, route }) => {
     const domain = DB_DOMAIN;
     const { hallName } = route.params;
     const [menuData, setMenuData] = useState({});
@@ -523,172 +524,179 @@ const MenuScreen = ({ route }) => {
     );
 
     // MenuScreen.js return statement
-return (
-    <View style={styles.container}>
-        <Text style={styles.title}>{hallName} Menu</Text>
-        
-        {renderSearchBar()}
-        {renderDaySelector()}
-        
-        <View style={styles.mealTypeContainer}>
-            <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.mealTypeScrollContent}
+    return (
+        <View style={styles.container}>
+            <View style={styles.contentContainer}>
+                <Text style={styles.title}>{hallName} Menu</Text>
+                {renderSearchBar()}
+                {renderDaySelector()}
+                
+                <View style={styles.mealTypeContainer}>
+                    <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.mealTypeScrollContent}
+                    >
+                        {Object.keys(menuData).map((meal) => (
+                            <TouchableOpacity
+                                key={meal}
+                                style={[
+                                    styles.mealTypeButton,
+                                    selectedMeal === meal && styles.selectedMealType
+                                ]}
+                                onPress={() => setSelectedMeal(meal)}
+                            >
+                                <Text style={[
+                                    styles.mealTypeText,
+                                    selectedMeal === meal && styles.selectedMealTypeText
+                                ]}>
+                                    {meal}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+                
+                {renderDietaryFilters()}
+    
+                {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#007AFF" />
+                    </View>
+                ) : (
+                    <FlatList
+                        data={Object.keys(categorizedMenuItems)}
+                        keyExtractor={(item) => item}
+                        renderItem={renderCategory}
+                        ListEmptyComponent={
+                            <Text style={styles.emptyMessage}>
+                                {searchQuery 
+                                    ? `No items found matching "${searchQuery}"`
+                                    : 'No items available for the selected filters'}
+                            </Text>
+                        }
+                    />
+                )}
+            </View>
+    
+            <CustomBottomNav navigation={navigation} currentScreen="MenuScreen" />
+    
+            {/* Nutrition Information Modal */}
+            <Modal
+                visible={isNutritionModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setIsNutritionModalVisible(false)}
             >
-                {Object.keys(menuData).map((meal) => (
-                    <TouchableOpacity
-                        key={meal}
-                        style={[
-                            styles.mealTypeButton,
-                            selectedMeal === meal && styles.selectedMealType
-                        ]}
-                        onPress={() => setSelectedMeal(meal)}
-                    >
-                        <Text style={[
-                            styles.mealTypeText,
-                            selectedMeal === meal && styles.selectedMealTypeText
-                        ]}>
-                            {meal}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-        </View>
-        
-        {renderDietaryFilters()}
-
-        {isLoading ? (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#007AFF" />
-            </View>
-        ) : (
-            <FlatList
-                data={Object.keys(categorizedMenuItems)}
-                keyExtractor={(item) => item}
-                renderItem={renderCategory}
-                ListEmptyComponent={
-                    <Text style={styles.emptyMessage}>
-                        {searchQuery 
-                            ? `No items found matching "${searchQuery}"`
-                            : 'No items available for the selected filters'}
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Nutritional Information</Text>
+                        {selectedItemNutrition && (
+                            <>
+                                <Text style={styles.nutritionItem}>
+                                    Item: {selectedItemNutrition.name}
+                                </Text>
+                                <Text style={styles.nutritionItem}>
+                                    Serving Size: {selectedItemNutrition.servingSize}
+                                </Text>
+                                <Text style={styles.nutritionItem}>
+                                    Calories: {selectedItemNutrition.nutrients.calories}
+                                </Text>
+                                <Text style={styles.nutritionItem}>
+                                    Total Fat: {selectedItemNutrition.nutrients.totalFat}
+                                </Text>
+                                <Text style={styles.nutritionItem}>
+                                    Total Carbohydrates: {selectedItemNutrition.nutrients.totalCarbohydrates}
+                                </Text>
+                                <Text style={styles.nutritionItem}>
+                                    Protein: {selectedItemNutrition.nutrients.protein}
+                                </Text>
+                                <Text style={styles.nutritionItem}>
+                                    Sodium: {selectedItemNutrition.nutrients.sodium}
+                                </Text>
+                                <Text style={styles.nutritionItem}>
+                                    Dietary Fiber: {selectedItemNutrition.nutrients.dietaryFiber}
+                                </Text>
+                                <Text style={styles.nutritionItem}>Allergens:</Text>
+                                {Object.entries(selectedItemNutrition.allergens)
+                                    .filter(([_, value]) => value)
+                                    .map(([allergen]) => (
+                                        <Text key={allergen} style={styles.allergenItem}>
+                                            • {allergen.charAt(0).toUpperCase() + allergen.slice(1)}
+                                        </Text>
+                                    ))
+                                }
+                            </>
+                        )}
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={() => setIsNutritionModalVisible(false)}
+                        >
+                            <Text style={styles.closeButtonText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+    
+            {/* Serving Size Modal */}
+            <Modal
+                visible={isServingSizeModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setIsServingSizeModalVisible(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Number of Servings</Text>
+                        <Text style={styles.itemName}>{itemToAdd?.name}</Text>
+                        
+                        <View style={styles.servingInputContainer}>
+                            <TextInput
+                                style={styles.servingInput}
+                                value={selectedServings}
+                                onChangeText={setSelectedServings}
+                                keyboardType="decimal-pad"
+                                placeholder="1"
+                                autoFocus={true}
+                            />
+                            <Text style={styles.servingText}>servings</Text>
+                        </View>
+    
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setIsServingSizeModalVisible(false)}
+                            >
+                                <Text style={styles.modalButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.confirmButton]}
+                                onPress={handleConfirmServings}
+                            >
+                                <Text style={styles.modalButtonText}>Add to Planner</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            
+            {/* Success Indicator */}
+            {favoriteIndicatorVisible && (
+                <View style={styles.favoriteIndicator}>
+                    <Text style={styles.favoriteIndicatorText}>
+                        Added to Meal Planner!
                     </Text>
-                }
-            />
-        )}
-
-        {/* Nutrition Information Modal */}
-        <Modal
-            visible={isNutritionModalVisible}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setIsNutritionModalVisible(false)}
-        >
-            <View style={styles.modalContainer}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Nutritional Information</Text>
-                    {selectedItemNutrition && (
-                        <>
-                            <Text style={styles.nutritionItem}>
-                                Item: {selectedItemNutrition.name}
-                            </Text>
-                            <Text style={styles.nutritionItem}>
-                                Serving Size: {selectedItemNutrition.servingSize}
-                            </Text>
-                            <Text style={styles.nutritionItem}>
-                                Calories: {selectedItemNutrition.nutrients.calories}
-                            </Text>
-                            <Text style={styles.nutritionItem}>
-                                Total Fat: {selectedItemNutrition.nutrients.totalFat}
-                            </Text>
-                            <Text style={styles.nutritionItem}>
-                                Total Carbohydrates: {selectedItemNutrition.nutrients.totalCarbohydrates}
-                            </Text>
-                            <Text style={styles.nutritionItem}>
-                                Protein: {selectedItemNutrition.nutrients.protein}
-                            </Text>
-                            <Text style={styles.nutritionItem}>
-                                Sodium: {selectedItemNutrition.nutrients.sodium}
-                            </Text>
-                            <Text style={styles.nutritionItem}>
-                                Dietary Fiber: {selectedItemNutrition.nutrients.dietaryFiber}
-                            </Text>
-                            <Text style={styles.nutritionItem}>Allergens:</Text>
-                            {Object.entries(selectedItemNutrition.allergens)
-                                .filter(([_, value]) => value)
-                                .map(([allergen]) => (
-                                    <Text key={allergen} style={styles.allergenItem}>
-                                        • {allergen.charAt(0).toUpperCase() + allergen.slice(1)}
-                                    </Text>
-                                ))
-                            }
-                        </>
-                    )}
-                    <TouchableOpacity
-                        style={styles.closeButton}
-                        onPress={() => setIsNutritionModalVisible(false)}
-                    >
-                        <Text style={styles.closeButtonText}>Close</Text>
-                    </TouchableOpacity>
                 </View>
-            </View>
-        </Modal>
-
-        {/* Serving Size Modal */}
-        <Modal
-            visible={isServingSizeModalVisible}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setIsServingSizeModalVisible(false)}
-        >
-            <View style={styles.modalContainer}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Number of Servings</Text>
-                    <Text style={styles.itemName}>{itemToAdd?.name}</Text>
-                    
-                    <View style={styles.servingInputContainer}>
-                        <TextInput
-                            style={styles.servingInput}
-                            value={selectedServings}
-                            onChangeText={setSelectedServings}
-                            keyboardType="decimal-pad"
-                            placeholder="1"
-                            autoFocus={true}
-                        />
-                        <Text style={styles.servingText}>servings</Text>
-                    </View>
-
-                    <View style={styles.modalButtons}>
-                        <TouchableOpacity
-                            style={[styles.modalButton, styles.cancelButton]}
-                            onPress={() => setIsServingSizeModalVisible(false)}
-                        >
-                            <Text style={styles.modalButtonText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.modalButton, styles.confirmButton]}
-                            onPress={handleConfirmServings}
-                        >
-                            <Text style={styles.modalButtonText}>Add to Planner</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>
-        </Modal>
-        
-        {/* Success Indicator */}
-        {favoriteIndicatorVisible && (
-            <View style={styles.favoriteIndicator}>
-                <Text style={styles.favoriteIndicatorText}>
-                    Added to Meal Planner!
-                </Text>
-            </View>
-        )}
-    </View>
-);
-  };
+            )}
+        </View>
+    );
+};
 
 const styles = StyleSheet.create({
+    contentContainer: {
+        flex: 1,
+        paddingBottom: 60,
+    },
     container: {
         flex: 1,
         backgroundColor: '#f8f8f8',

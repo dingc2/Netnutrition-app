@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Alert, FlatList, TouchableOpacity, ActivityIndi
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { DB_DOMAIN } from '@env';
+import CustomBottomNav from '../navigation/CustomButtonNav';
 
 const ProfileDetails = ({ navigation }) => {
     const domain = DB_DOMAIN;
@@ -193,21 +194,6 @@ const renderMealPlanItem = ({ item }) => {
 
     return (
         <View style={styles.container}>
-            {/* Header Buttons */}
-            <TouchableOpacity 
-                style={styles.diningHallsButton}
-                onPress={navigateToDiningHalls}
-            >
-                <Text style={styles.diningHallsButtonText}>View Dining Halls</Text>
-            </TouchableOpacity>
-    
-            <TouchableOpacity 
-                style={styles.logoutButton}
-                onPress={handleLogout}
-            >
-                <Text style={styles.logoutButtonText}>Logout</Text>
-            </TouchableOpacity>
-    
             <View style={styles.contentContainer}>
                 {/* Profile Information */}
                 <Text style={styles.title}>Profile</Text>
@@ -217,7 +203,7 @@ const renderMealPlanItem = ({ item }) => {
                         <Text style={styles.info}>{user?.email || 'Not available'}</Text>
                     </View>
                 </View>
-    
+     
                 {/* Nutritional Summary */}
                 <View style={styles.totalNutrition}>
                     <Text style={styles.totalNutritionTitle}>Daily Totals</Text>
@@ -248,7 +234,7 @@ const renderMealPlanItem = ({ item }) => {
                         </View>
                     </View>
                 </View>
-    
+     
                 {/* Meal Planner Section */}
                 <Text style={styles.sectionTitle}>Meal Planner</Text>
                 
@@ -263,12 +249,10 @@ const renderMealPlanItem = ({ item }) => {
                         renderItem={({ item }) => (
                             <View style={styles.mealPlanItem}>
                                 <View style={styles.itemInfo}>
-                                    {/* Item Name and Basic Info */}
                                     <Text style={styles.itemName} numberOfLines={2}>
                                         {item.food_name}
                                     </Text>
                                     
-                                    {/* Location and Serving Info */}
                                     <Text style={styles.itemDetails} numberOfLines={1}>
                                         {[
                                             item.dining_hall,
@@ -276,15 +260,13 @@ const renderMealPlanItem = ({ item }) => {
                                             item.serving_size
                                         ].filter(Boolean).join(' • ')}
                                     </Text>
-    
-                                    {/* Nutritional Information */}
+     
                                     <View style={styles.itemNutrition}>
                                         <Text style={styles.nutritionPrimary}>
                                             {item.calories} calories
                                         </Text>
                                     </View>
-    
-                                    {/* Dietary Tags */}
+     
                                     <View style={styles.tagsContainer}>
                                         {item.is_vegetarian && (
                                             <Text style={styles.dietaryTag}>Vegetarian</Text>
@@ -294,8 +276,7 @@ const renderMealPlanItem = ({ item }) => {
                                         )}
                                     </View>
                                 </View>
-    
-                                {/* Remove Button */}
+     
                                 <TouchableOpacity
                                     style={styles.removeButton}
                                     onPress={() => {
@@ -325,11 +306,24 @@ const renderMealPlanItem = ({ item }) => {
                     />
                 )}
             </View>
+     
+            <CustomBottomNav navigation={navigation} currentScreen="ProfileDetails" />
+     
+            <TouchableOpacity 
+                style={styles.logoutButton}
+                onPress={handleLogout}
+            >
+                <Text style={styles.logoutButtonText}>Logout</Text>
+            </TouchableOpacity>
         </View>
-    );
+     );
 };
 
 const newStyles = {
+    contentContainer: {
+        flex: 1,
+        paddingBottom: 60,
+    },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
