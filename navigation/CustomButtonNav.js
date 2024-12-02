@@ -2,26 +2,17 @@ import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Linking } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import { auth } from '../firebase';
 
 const CustomBottomNav = ({ navigation, currentScreen }) => {
   const openWaitTimes = () => {
     Linking.openURL('https://campusdining.vanderbilt.edu/wait-times/');
   };
 
-  const navigateToProfile = async () => {
-    try {
-      
-      const userToken = await AsyncStorage.getItem('userToken');
-      
-      if (userToken) {
-        
-        navigation.navigate('ProfileDetails');
-      } else {
-        navigation.navigate('ProfileScreen');
-      }
-    } catch (error) {
-      console.error('Error checking authentication status:', error);
+  const navigateToProfile = () => {
+    if (auth.currentUser) {
+      navigation.navigate('ProfileDetails');
+    } else {
       navigation.navigate('ProfileScreen');
     }
   };
