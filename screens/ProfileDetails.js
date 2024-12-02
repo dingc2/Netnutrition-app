@@ -85,6 +85,7 @@ const ProfileDetails = ({ navigation }) => {
 
     const fetchMealPlanItems = async (userId) => {
         try {
+            console.log(domain);
             const response = await fetch(`http://${domain}:3000/meal-planner/${userId}`);
             if (!response.ok) throw new Error('Failed to fetch meal plan');
             
@@ -121,6 +122,7 @@ const ProfileDetails = ({ navigation }) => {
 
 const removeMealPlanItem = async (item) => {
     try {
+        console.log(domain);
         const domain = DB_DOMAIN;
         const response = await fetch(
             `http://${domain}:3000/meal-planner/${user.uid}/${item.food_id?.toString()}`,

@@ -39,6 +39,7 @@ const DiningHalls = ({ navigation }) => {
      
      const fetchDiningHalls = async (userFavorites) => {
         try {
+            console.log(domain);
             const response = await fetch(`http://${domain}:3000/dining-halls`);
             const data = await response.json();
             const hallsWithHours = await Promise.all(data.map(async (hall) => {

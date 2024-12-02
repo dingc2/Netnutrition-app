@@ -15,6 +15,7 @@ const HoursScreen = ({ navigation, route }) => {
 
     const fetchHours = async () => {
         try {
+            console.log(domain);
             const response = await fetch(`http://${domain}:3000/dining-halls/${hallName}/hours`);
             const data = await response.json();
 

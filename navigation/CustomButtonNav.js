@@ -44,7 +44,7 @@ const CustomBottomNav = ({ navigation, currentScreen }) => {
         <Icon
           name="user"
           size={24}
-          color={currentScreen === 'ProfileDetails' || currentScreen === 'Login' ? '#99773d' : '#666'}
+          color={currentScreen === 'ProfileDetails' || currentScreen === 'ProfileScreen' ? '#99773d' : '#666'}
         />
         <Text style={styles.tabText}>Profile</Text>
       </TouchableOpacity>
