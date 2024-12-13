@@ -1,4 +1,4 @@
-# Netnutrition-app
+# Vanderbilt Dining App
 
 Our app is now on the IOS app store!
 
