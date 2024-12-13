@@ -1,5 +1,7 @@
 # Netnutrition-app
 
+Our app is now on the app store!
+
 This repo is for the development of the NetNutrition app that will obtain data
 from the Department of Dining's server or by scraping the website but with
 more customizable preferences in order to provide the most solid experience
