@@ -1,6 +1,9 @@
 # Netnutrition-app
 
-Our app is now on the app store!
+Our app is now on the IOS app store!
+
+App Store link: 
+https://apps.apple.com/us/app/vanderbilt-dining-app/id6738943583
 
 This repo is for the development of the NetNutrition app that will obtain data
 from the Department of Dining's server or by scraping the website but with
